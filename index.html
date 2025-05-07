@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>隨機分組器</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #1e1e1e;
+      color: #f0f0f0;
+      padding: 40px;
+      max-width: 800px;
+      margin: auto;
+    }
+    h1 {
+      text-align: center;
+      color: #4fc3f7;
+    }
+    textarea, input[type=text] {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      background: #333;
+      color: #fff;
+      border: 2px solid #555;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    button {
+      background: #4fc3f7;
+      color: #000;
+      padding: 12px;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: bold;
+      margin-top: 20px;
+      cursor: pointer;
+      transition: background 0.3s;
+      width: 100%;
+    }
+    button:hover {
+      background: #29b6f6;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+    li {
+      margin: 5px 0;
+      padding: 8px;
+      background: #2a2a2a;
+      border-radius: 6px;
+    }
+    .highlight {
+      font-weight: bold;
+      color: #55ff88;
+    }
+  </style>
+</head>
+<body>
+  <h1>隨機分組器</h1>
+
+  <h2>新增選手（用逗號或換行分隔）：</h2>
+  <textarea id="newPlayers" placeholder="輸入選手名單，例如：小美, Mike, 阿德"></textarea>
+  <button onclick="addPlayers()">新增選手</button>
+
+  <h2>選手名單：</h2>
+  <ul id="playerList"></ul>
+
+  <button onclick="generateGroup()">隨機分組（4 人）</button>
+
+  <h2>分組結果：</h2>
+  <ul id="groupResult"></ul>
+
+  <h2>出場次數統計：</h2>
+  <ul id="countList"></ul>
+
+  <button onclick="clearData()">🧹 清除所有資料</button>
+
+  <script>
+    let players = JSON.parse(localStorage.getItem('players')) || [];
+    let count = JSON.parse(localStorage.getItem('count')) || {};
+
+    function saveData() {
+      localStorage.setItem('players', JSON.stringify(players));
+      localStorage.setItem('count', JSON.stringify(count));
+    }
+
+    function renderList() {
+      const list = document.getElementById('playerList');
+      list.innerHTML = '';
+      players.forEach(p => {
+        const li = document.createElement('li');
+        li.textContent = p;
+        list.appendChild(li);
+      });
+
+      const countList = document.getElementById('countList');
+      countList.innerHTML = '';
+      const sorted = [...players].sort((a, b) => (count[b] || 0) - (count[a] || 0));
+      sorted.forEach(p => {
+        const li = document.createElement('li');
+        li.innerHTML = `${p} : ${(count[p] || 0)} 場`;
+        countList.appendChild(li);
+      });
+    }
+
+    function addPlayers() {
+      const input = document.getElementById('newPlayers').value;
+      const newNames = input.split(/[\n,]+/).map(s => s.trim()).filter(s => s);
+      newNames.forEach(name => {
+        if (!players.includes(name)) {
+          players.push(name);
+          count[name] = 0;
+        }
+      });
+      saveData();
+      renderList();
+      document.getElementById('newPlayers').value = '';
+      alert('✅ 已新增成功！');
+    }
+
+    function generateGroup() {
+      if (players.length < 4) {
+        alert('至少需要 4 名選手才可以分組');
+        return;
+      }
+      const shuffled = [...players].sort(() => 0.5 - Math.random());
+      const group = shuffled.slice(0, 4);
+      group.forEach(name => {
+        count[name] = (count[name] || 0) + 1;
+      });
+      saveData();
+
+      const result = document.getElementById('groupResult');
+      result.innerHTML = '';
+      group.forEach(p => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span class="highlight">${p}</span>`;
+        result.appendChild(li);
+      });
+      renderList();
+    }
+
+    function clearData() {
+      if (confirm('確定要清除所有資料嗎？')) {
+        localStorage.removeItem('players');
+        localStorage.removeItem('count');
+        players = [];
+        count = {};
+        renderList();
+        document.getElementById('groupResult').innerHTML = '';
+      }
+    }
+
+    renderList();
+  </script>
+</body>
+</html>
