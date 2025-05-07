@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>隨機分組結果</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #111;
+      color: #fff;
+      padding: 40px;
+    }
+    h1 { font-size: 28px; }
+    ul { margin-bottom: 20px; }
+    button {
+      background-color: #444;
+      color: white;
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    button:hover { background-color: #666; }
+    .highlight { font-weight: bold; color: #55ff88; }
+    form { display: inline-block; margin-right: 10px; }
+  </style>
+</head>
+<body>
+  <h1>隨機 4 人分組結果</h1>
+
+  {% if match %}
+    <h2>本輪分組</h2>
+    <ul>
+      {% for player in match %}
+        <li>{{ player }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p style="color: #f88;">⚠️ 找不到分組名單，請從首頁輸入選手。</p>
+  {% endif %}
+
+  <h2>出場次數統計（由多到少）</h2>
+  {% if count %}
+    <ul>
+      {% for name, count in count.items()|sort(attribute='1', reverse=true) %}
+        <li {% if match and name in match %}class="highlight"{% endif %}>{{ name }} : {{ count }} 場</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>尚無統計資料。</p>
+  {% endif %}
+
+  <div style="margin-top: 30px;">
+    <form action="/" method="post">
+      {% for name in last_players.split(",") if name.strip() %}
+        <input type="hidden" name="players" value="{{ name }}">
+      {% endfor %}
+      <input type="hidden" name="action" value="schedule">
+      <button type="submit">再分一次（優先未出場）</button>
+    </form>
+
+    <form action="/clear_count" method="post">
+      {% for name in last_players.split(",") if name.strip() %}
+        <input type="hidden" name="players" value="{{ name }}">
+      {% endfor %}
+      <button type="submit">🧹 清除出場次數統計</button>
+    </form>
+
+    <form action="/" method="post">
+      <input type="hidden" name="action" value="edit">
+      <input type="hidden" name="players" value="{{ last_players }}">
+      <button type="submit">🔙 回到上一頁（編輯名單）</button>
+    </form>
+  </div>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>選擇參與的選手</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #111;
+      color: #fff;
+      padding: 40px;
+    }
+    textarea {
+      width: 100%;
+      height: 150px;
+      font-size: 16px;
+      margin-bottom: 10px;
+    }
+    .player-box {
+      display: inline-block;
+      padding: 10px;
+      margin: 6px;
+      background: #333;
+      border-radius: 8px;
+    }
+    button {
+      margin-top: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background-color: #444;
+      color: white;
+    }
+    button:hover {
+      background-color: #666;
+    }
+    .error {
+      color: red;
+    }
+  </style>
+</head>
+<body>
+  <h1>選擇參與的選手</h1>
+
+  <form method="post">
+    <label>新增選手（用逗號或換行分隔）：</label><br>
+    <textarea name="new_players" placeholder="例如：小美, Mike, 阿德"></textarea><br>
+
+    <div>
+      {% for name in last_players.split(',') if name.strip() %}
+        <div class="player-box">
+          <label>
+            <input type="checkbox" name="players" value="{{ name }}" checked> {{ name }}
+          </label><br>
+          <label>
+            <input type="checkbox" name="delete_players" value="{{ name }}"> ❌ 刪除
+          </label>
+        </div>
+      {% endfor %}
+    </div>
+
+    <br><button type="submit" name="action" value="schedule">產生排程</button>
+  </form>
+
+  {% if error %}
+    <p class="error">🚨 {{ error }}</p>
+  {% endif %}
+</body>
+</html>
