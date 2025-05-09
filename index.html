@@ -810,6 +810,41 @@
       }
     }
 
+    function addPlayers() {
+      const input = document.getElementById('newPlayers').value.trim();
+      if (!input) {
+        alert('請輸入選手名單');
+        return;
+      }
+      
+      const newPlayers = input.split(/[,，、\n]/).map(name => name.trim()).filter(name => name);
+      
+      // 檢查重複名字
+      const duplicates = newPlayers.filter(name => players.includes(name));
+      if (duplicates.length > 0) {
+        alert(`以下選手已存在：${duplicates.join('、')}`);
+        return;
+      }
+      
+      // 新增選手
+      players.push(...newPlayers);
+      
+      // 初始化新選手的出場次數
+      newPlayers.forEach(name => {
+        count[name] = 0;
+      });
+      
+      // 儲存並更新顯示
+      saveData();
+      renderList();
+      updateStats();
+      
+      // 清空輸入框
+      document.getElementById('newPlayers').value = '';
+      
+      alert(`✅ 已新增 ${newPlayers.length} 名選手`);
+    }
+
     renderList();
     renderHistory();
     updateStats();
