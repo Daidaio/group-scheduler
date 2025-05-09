@@ -157,11 +157,10 @@
 
       const result = document.getElementById('groupResult');
       result.innerHTML = '';
-      group.forEach(p => {
-        const li = document.createElement('li');
-        li.innerHTML = `<span class="highlight">${p}</span>`;
-        result.appendChild(li);
-      });
+      const li = document.createElement('li');
+      li.innerHTML = `<span class="highlight">${group[0]}</span> & <span class="highlight">${group[1]}</span> VS <span class="highlight">${group[2]}</span> & <span class="highlight">${group[3]}</span>`;
+      result.appendChild(li);
+      
       renderList(selectedPlayers);
     }
 
