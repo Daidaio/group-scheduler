@@ -564,43 +564,47 @@
       const checkboxes = document.querySelectorAll('#playerList input[type="checkbox"]:checked');
       const selectedPlayers = Array.from(checkboxes).map(cb => cb.value);
       const groupSize = parseInt(document.getElementById('groupSize').value) || 4;
-      const balanceMode = document.getElementById('balanceMode').value;
       
       if (selectedPlayers.length < groupSize) {
         alert(`至少需要勾選 ${groupSize} 名選手才可以分組`);
         return;
       }
 
-      let selectedForGame;
-      
-      switch (balanceMode) {
-        case 'strict':
-          // 嚴格按照出場次數選擇
-          selectedForGame = [...selectedPlayers]
-            .sort((a, b) => (count[a] || 0) - (count[b] || 0))
-            .slice(0, groupSize);
-          break;
-          
-        case 'normal':
-          // 現有的平衡算法
-          const sortedPlayers = selectedPlayers.sort((a, b) => {
-            const countA = count[a] || 0;
-            const countB = count[b] || 0;
-            return countA - countB;
-          });
-          selectedForGame = sortedPlayers.slice(0, groupSize);
-          break;
-          
-        case 'random':
-          // 完全隨機
-          selectedForGame = [...selectedPlayers]
-            .sort(() => Math.random() - 0.5)
-            .slice(0, groupSize);
-          break;
-      }
+      // 根據出場次數排序選手
+      const sortedPlayers = selectedPlayers.sort((a, b) => {
+        const countA = count[a] || 0;
+        const countB = count[b] || 0;
+        return countA - countB;
+      });
 
-      // 隨機打亂最終選出的選手順序來決定分組
-      selectedForGame = selectedForGame.sort(() => Math.random() - 0.5);
+      // 優先選擇出場次數最少的選手
+      let selectedForGame = sortedPlayers.slice(0, groupSize);
+      
+      // 如果有相同出場次數的選手，隨機打亂他們的順序
+      const countGroups = {};
+      selectedForGame.forEach(player => {
+        const playCount = count[player] || 0;
+        if (!countGroups[playCount]) {
+          countGroups[playCount] = [];
+        }
+        countGroups[playCount].push(player);
+      });
+
+      // 在相同出場次數的選手中隨機打亂
+      selectedForGame = [];
+      Object.values(countGroups).forEach(group => {
+        for (let i = group.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [group[i], group[j]] = [group[j], group[i]];
+        }
+        selectedForGame = selectedForGame.concat(group);
+      });
+
+      // 最後再隨機打亂整體順序來決定分組
+      for (let i = selectedForGame.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [selectedForGame[i], selectedForGame[j]] = [selectedForGame[j], selectedForGame[i]];
+      }
 
       // 更新出場次數
       selectedForGame.forEach(name => {
