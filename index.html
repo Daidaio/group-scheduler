@@ -77,7 +77,7 @@
   <h2>出場次數統計：</h2>
   <ul id="countList"></ul>
 
-  <button onclick="clearData()">🧹 清除所有資料</button>
+  <button onclick="clearData()">🔄 重置出場次數統計</button>
 
   <script>
     let players = JSON.parse(localStorage.getItem('players')) || [];
@@ -160,11 +160,13 @@
     }
 
     function clearData() {
-      if (confirm('確定要清除所有資料嗎？')) {
-        localStorage.removeItem('players');
+      if (confirm('確定要重置所有選手的出場次數統計嗎？')) {
         localStorage.removeItem('count');
-        players = [];
         count = {};
+        players.forEach(player => {
+          count[player] = 0;
+        });
+        saveData();
         renderList();
         document.getElementById('groupResult').innerHTML = '';
       }
