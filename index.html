@@ -194,55 +194,202 @@
       background: #333;
       border-radius: 8px;
     }
+
+    .stats-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-top: 15px;
+    }
+
+    .stat-card {
+      background: #333;
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 1.5em;
+      color: #4fc3f7;
+      font-weight: bold;
+    }
+
+    .stat-label {
+      color: #888;
+      font-size: 0.9em;
+      margin-top: 5px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .tab {
+      padding: 10px 20px;
+      background: #333;
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .tab.active {
+      background: #4fc3f7;
+      color: #000;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .chart-container {
+      background: #333;
+      padding: 20px;
+      border-radius: 8px;
+      margin-top: 20px;
+    }
+
+    .player-bar {
+      display: flex;
+      align-items: center;
+      margin: 10px 0;
+      gap: 10px;
+    }
+
+    .bar {
+      background: #4fc3f7;
+      height: 20px;
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+
+    .bar-label {
+      min-width: 100px;
+    }
+
+    .options-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      margin: 15px 0;
+    }
+
+    .option-card {
+      background: #333;
+      padding: 10px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .quick-actions {
+      display: flex;
+      gap: 10px;
+      margin: 15px 0;
+    }
+
+    .quick-action-btn {
+      background: #333;
+      border: none;
+      padding: 8px 15px;
+      border-radius: 4px;
+      color: #fff;
+      cursor: pointer;
+      font-size: 0.9em;
+    }
+
+    .quick-action-btn:hover {
+      background: #444;
+    }
   </style>
 </head>
 <body>
   <h1>🏸 隨機分組器</h1>
 
   <div class="container">
-    <h2>📝 新增選手</h2>
-    <textarea id="newPlayers" rows="4" placeholder="輸入選手名單，例如：小美, Mike, 阿德"></textarea>
-    <button onclick="addPlayers()">➕ 新增選手</button>
-  </div>
-
-  <div class="container">
-    <h2>👥 選手名單</h2>
-    <div class="select-all-container">
-      <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
-      <label for="selectAll">全選/取消全選</label>
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('players')">👥 選手管理</button>
+      <button class="tab" onclick="showTab('grouping')">🎲 分組</button>
+      <button class="tab" onclick="showTab('stats')">📊 統計</button>
     </div>
-    <ul id="playerList"></ul>
-    <div class="button-group three-columns">
-      <button onclick="removeSelectedPlayers()" class="danger-button">🗑️ 移除勾選</button>
-      <button onclick="exportPlayers()">💾 匯出名單</button>
-      <button onclick="document.getElementById('importFile').click()">📂 匯入名單</button>
-      <input type="file" id="importFile" style="display: none" onchange="importPlayers(event)">
+
+    <div id="players-tab" class="tab-content active">
+      <h2>📝 新增選手</h2>
+      <textarea id="newPlayers" rows="4" placeholder="輸入選手名單，例如：小美, Mike, 阿德"></textarea>
+      <button onclick="addPlayers()">➕ 新增選手</button>
+
+      <h2>👥 選手名單</h2>
+      <div class="quick-actions">
+        <button class="quick-action-btn" onclick="selectAll(true)">全選</button>
+        <button class="quick-action-btn" onclick="selectAll(false)">取消全選</button>
+        <button class="quick-action-btn" onclick="selectByPlayCount('least')">選擇場次最少</button>
+        <button class="quick-action-btn" onclick="selectByPlayCount('most')">選擇場次最多</button>
+      </div>
+      <div class="select-all-container">
+        <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+        <label for="selectAll">全選/取消全選</label>
+      </div>
+      <ul id="playerList"></ul>
+      <div class="button-group three-columns">
+        <button onclick="removeSelectedPlayers()" class="danger-button">🗑️ 移除勾選</button>
+        <button onclick="exportPlayers()">💾 匯出名單</button>
+        <button onclick="document.getElementById('importFile').click()">📂 匯入名單</button>
+        <input type="file" id="importFile" style="display: none" onchange="importPlayers(event)">
+      </div>
     </div>
-  </div>
 
-  <div class="container">
-    <h2>🎲 分組設定</h2>
-    <div class="group-size">
-      <label for="groupSize">每組人數：</label>
-      <input type="number" id="groupSize" value="4" min="2" max="10">
+    <div id="grouping-tab" class="tab-content">
+      <h2>🎲 分組設定</h2>
+      <div class="options-grid">
+        <div class="option-card">
+          <label for="groupSize">每組人數</label>
+          <input type="number" id="groupSize" value="4" min="2" max="10">
+        </div>
+        <div class="option-card">
+          <label for="balanceMode">平衡模式</label>
+          <select id="balanceMode">
+            <option value="strict">嚴格平衡</option>
+            <option value="normal">一般平衡</option>
+            <option value="random">完全隨機</option>
+          </select>
+        </div>
+      </div>
+      <button onclick="generateGroup()">開始分組</button>
+      <div id="groupResult"></div>
     </div>
-    <button onclick="generateGroup()">開始分組</button>
-  </div>
 
-  <div class="container">
-    <h2>🏆 分組結果</h2>
-    <ul id="groupResult"></ul>
-  </div>
+    <div id="stats-tab" class="tab-content">
+      <h2>📊 統計資訊</h2>
+      <div class="stats-container">
+        <div class="stat-card">
+          <div class="stat-value" id="totalPlayers">0</div>
+          <div class="stat-label">總選手數</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="totalGames">0</div>
+          <div class="stat-label">總場次</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="avgGames">0</div>
+          <div class="stat-label">平均場次</div>
+        </div>
+      </div>
 
-  <div class="container">
-    <h2>📊 出場次數統計</h2>
-    <ul id="countList"></ul>
-    <button onclick="clearData()">🔄 重置出場次數統計</button>
-  </div>
+      <div class="chart-container">
+        <h3>出場次數分布</h3>
+        <div id="playCountChart"></div>
+      </div>
 
-  <div class="container">
-    <h2>📜 歷史紀錄</h2>
-    <ul id="historyList"></ul>
+      <h2>📜 歷史紀錄</h2>
+      <ul id="historyList"></ul>
+    </div>
   </div>
 
   <script>
@@ -336,51 +483,124 @@
       });
     }
 
+    function showTab(tabName) {
+      // 隱藏所有標籤頁
+      document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      document.querySelectorAll('.tab').forEach(tab => {
+        tab.classList.remove('active');
+      });
+
+      // 顯示選中的標籤頁
+      document.getElementById(tabName + '-tab').classList.add('active');
+      document.querySelector(`.tab[onclick="showTab('${tabName}')"]`).classList.add('active');
+
+      // 如果是統計頁面，更新統計資訊
+      if (tabName === 'stats') {
+        updateStats();
+      }
+    }
+
+    function updateStats() {
+      // 更新基本統計資訊
+      document.getElementById('totalPlayers').textContent = players.length;
+      const totalGames = Object.values(count).reduce((sum, c) => sum + c, 0);
+      document.getElementById('totalGames').textContent = totalGames;
+      document.getElementById('avgGames').textContent = 
+        (totalGames / (players.length || 1)).toFixed(1);
+
+      // 更新出場次數圖表
+      const chartContainer = document.getElementById('playCountChart');
+      chartContainer.innerHTML = '';
+      
+      // 獲取最大出場次數作為基準
+      const maxCount = Math.max(...Object.values(count), 1);
+      
+      // 為每個選手創建長條圖
+      players.forEach(player => {
+        const playerCount = count[player] || 0;
+        const barWidth = (playerCount / maxCount * 100).toFixed(1);
+        
+        const playerBar = document.createElement('div');
+        playerBar.className = 'player-bar';
+        playerBar.innerHTML = `
+          <div class="bar-label">${player}</div>
+          <div class="bar" style="width: ${barWidth}%"></div>
+          <div>${playerCount} 場</div>
+        `;
+        chartContainer.appendChild(playerBar);
+      });
+    }
+
+    function selectByPlayCount(mode) {
+      const checkboxes = document.querySelectorAll('#playerList input[type="checkbox"]');
+      const playerCounts = players.map(p => ({
+        name: p,
+        count: count[p] || 0
+      }));
+
+      // 根據場次排序
+      playerCounts.sort((a, b) => mode === 'least' ? a.count - b.count : b.count - a.count);
+      
+      // 選擇前4名（或設定的分組人數）
+      const groupSize = parseInt(document.getElementById('groupSize').value) || 4;
+      const selectedPlayers = new Set(playerCounts.slice(0, groupSize).map(p => p.name));
+
+      // 更新勾選狀態
+      checkboxes.forEach(cb => {
+        cb.checked = selectedPlayers.has(cb.value);
+      });
+    }
+
+    function selectAll(checked) {
+      const checkboxes = document.querySelectorAll('#playerList input[type="checkbox"]');
+      checkboxes.forEach(cb => {
+        cb.checked = checked;
+      });
+    }
+
     function generateGroup() {
       const checkboxes = document.querySelectorAll('#playerList input[type="checkbox"]:checked');
       const selectedPlayers = Array.from(checkboxes).map(cb => cb.value);
       const groupSize = parseInt(document.getElementById('groupSize').value) || 4;
+      const balanceMode = document.getElementById('balanceMode').value;
       
       if (selectedPlayers.length < groupSize) {
         alert(`至少需要勾選 ${groupSize} 名選手才可以分組`);
         return;
       }
 
-      // 根據出場次數排序選手
-      const sortedPlayers = selectedPlayers.sort((a, b) => {
-        const countA = count[a] || 0;
-        const countB = count[b] || 0;
-        return countA - countB;
-      });
-
-      // 優先選擇出場次數最少的選手
-      let selectedForGame = sortedPlayers.slice(0, groupSize);
+      let selectedForGame;
       
-      // 如果有相同出場次數的選手，隨機打亂他們的順序
-      const countGroups = {};
-      selectedForGame.forEach(player => {
-        const playCount = count[player] || 0;
-        if (!countGroups[playCount]) {
-          countGroups[playCount] = [];
-        }
-        countGroups[playCount].push(player);
-      });
-
-      // 在相同出場次數的選手中隨機打亂
-      selectedForGame = [];
-      Object.values(countGroups).forEach(group => {
-        for (let i = group.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [group[i], group[j]] = [group[j], group[i]];
-        }
-        selectedForGame = selectedForGame.concat(group);
-      });
-
-      // 最後再隨機打亂整體順序來決定分組
-      for (let i = selectedForGame.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [selectedForGame[i], selectedForGame[j]] = [selectedForGame[j], selectedForGame[i]];
+      switch (balanceMode) {
+        case 'strict':
+          // 嚴格按照出場次數選擇
+          selectedForGame = [...selectedPlayers]
+            .sort((a, b) => (count[a] || 0) - (count[b] || 0))
+            .slice(0, groupSize);
+          break;
+          
+        case 'normal':
+          // 現有的平衡算法
+          const sortedPlayers = selectedPlayers.sort((a, b) => {
+            const countA = count[a] || 0;
+            const countB = count[b] || 0;
+            return countA - countB;
+          });
+          selectedForGame = sortedPlayers.slice(0, groupSize);
+          break;
+          
+        case 'random':
+          // 完全隨機
+          selectedForGame = [...selectedPlayers]
+            .sort(() => Math.random() - 0.5)
+            .slice(0, groupSize);
+          break;
       }
+
+      // 隨機打亂最終選出的選手順序來決定分組
+      selectedForGame = selectedForGame.sort(() => Math.random() - 0.5);
 
       // 更新出場次數
       selectedForGame.forEach(name => {
@@ -404,9 +624,6 @@
       `;
       result.appendChild(li);
       
-      addToHistory(selectedForGame);
-      renderList(selectedPlayers);
-
       // 顯示未被選中的選手
       const unselectedPlayers = selectedPlayers.filter(p => !selectedForGame.includes(p));
       if (unselectedPlayers.length > 0) {
@@ -416,6 +633,10 @@
         waitingLi.innerHTML = `候補選手：${unselectedPlayers.join('、')}`;
         result.appendChild(waitingLi);
       }
+
+      addToHistory(selectedForGame);
+      renderList(selectedPlayers);
+      updateStats();
     }
 
     function renderList(selectedPlayers = []) {
@@ -474,6 +695,7 @@
 
     renderList();
     renderHistory();
+    updateStats();
   </script>
 </body>
 </html>
