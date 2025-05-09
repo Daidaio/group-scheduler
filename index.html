@@ -56,6 +56,15 @@
       font-weight: bold;
       color: #55ff88;
     }
+    .highlight-team2 {
+      font-weight: bold;
+      color: #ff9955;
+    }
+    .vs-text {
+      color: #4fc3f7;
+      font-weight: bold;
+      margin: 0 10px;
+    }
   </style>
 </head>
 <body>
@@ -158,7 +167,7 @@
       const result = document.getElementById('groupResult');
       result.innerHTML = '';
       const li = document.createElement('li');
-      li.innerHTML = `<span class="highlight">${group[0]}</span> & <span class="highlight">${group[1]}</span> VS <span class="highlight">${group[2]}</span> & <span class="highlight">${group[3]}</span>`;
+      li.innerHTML = `<span class="highlight">${group[0]}</span> & <span class="highlight">${group[1]}</span> <span class="vs-text">VS</span> <span class="highlight-team2">${group[2]}</span> & <span class="highlight-team2">${group[3]}</span>`;
       result.appendChild(li);
       
       renderList(selectedPlayers);
