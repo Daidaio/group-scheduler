@@ -597,8 +597,8 @@
           team1.forEach(p1 => {
             team1.forEach(p2 => {
               if (p1 !== p2 && teamHistory[p1] && teamHistory[p1][p2]) {
-                teamHistory[p1][p2] += 2; // 增加權重，讓系統更傾向避免重複配對
-                teamHistory[p2][p1] += 2;
+                teamHistory[p1][p2]++;
+                teamHistory[p2][p1]++;
               }
             });
           });
@@ -606,36 +606,21 @@
           team2.forEach(p1 => {
             team2.forEach(p2 => {
               if (p1 !== p2 && teamHistory[p1] && teamHistory[p1][p2]) {
-                teamHistory[p1][p2] += 2;
-                teamHistory[p2][p1] += 2;
-              }
-            });
-          });
-
-          // 統計對手次數（較低權重）
-          team1.forEach(p1 => {
-            team2.forEach(p2 => {
-              if (teamHistory[p1] && teamHistory[p1][p2]) {
-                teamHistory[p1][p2] += 1;
-                teamHistory[p2][p1] += 1;
+                teamHistory[p1][p2]++;
+                teamHistory[p2][p1]++;
               }
             });
           });
         });
 
-        // 根據出場次數和搭配歷史排序選手
+        // 根據出場次數排序選手
         const sortedPlayers = selectedPlayers.sort((a, b) => {
           const countA = count[a] || 0;
           const countB = count[b] || 0;
-          if (Math.abs(countA - countB) > 2) { // 如果場次差距大於2，優先考慮場次
-            return countA - countB;
-          }
-          // 場次相近時，考慮搭配歷史
-          const teamCountA = Object.values(teamHistory[a]).reduce((sum, c) => sum + c, 0);
-          const teamCountB = Object.values(teamHistory[b]).reduce((sum, c) => sum + c, 0);
-          return teamCountA - teamCountB;
+          return countA - countB;
         });
 
+        // 選擇場次最少的選手
         selectedForGame = sortedPlayers.slice(0, groupSize);
 
         // 使用更智能的隊伍分配算法
@@ -643,8 +628,8 @@
         let bestTeams = null;
         let lowestScore = Infinity;
 
-        // 嘗試多次分組，找出最佳組合
-        for (let attempt = 0; attempt < 20; attempt++) {
+        // 嘗試更多次分組，找出最佳組合
+        for (let attempt = 0; attempt < 50; attempt++) {
           const shuffled = [...selectedForGame];
           for (let i = shuffled.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
@@ -661,7 +646,7 @@
           team1.forEach(p1 => {
             team1.forEach(p2 => {
               if (p1 !== p2) {
-                score += teamHistory[p1][p2] * 2; // 隊友歷史權重加倍
+                score += (teamHistory[p1][p2] || 0) * 3; // 增加隊友歷史權重
               }
             });
           });
@@ -669,10 +654,19 @@
           team2.forEach(p1 => {
             team2.forEach(p2 => {
               if (p1 !== p2) {
-                score += teamHistory[p1][p2] * 2;
+                score += (teamHistory[p1][p2] || 0) * 3;
               }
             });
           });
+
+          // 計算場次差異分數
+          const team1Counts = team1.map(p => count[p] || 0);
+          const team2Counts = team2.map(p => count[p] || 0);
+          const team1Avg = team1Counts.reduce((a, b) => a + b, 0) / team1.length;
+          const team2Avg = team2Counts.reduce((a, b) => a + b, 0) / team2.length;
+          
+          // 增加場次平衡的權重
+          score += Math.abs(team1Avg - team2Avg) * 10;
 
           // 如果找到更好的組合，就更新
           if (score < lowestScore) {
@@ -681,41 +675,51 @@
           }
         }
 
+        if (bestTeams === null) {
+          alert('無法找到合適的分組，請重試');
+          return;
+        }
+
         selectedForGame = [...bestTeams[0], ...bestTeams[1]];
-      } else {
-        // 一般模式：只考慮出場次數
-        const sortedPlayers = selectedPlayers.sort((a, b) => {
-          const countA = count[a] || 0;
-          const countB = count[b] || 0;
-          return countA - countB;
-        });
-
-        selectedForGame = sortedPlayers.slice(0, groupSize);
-        
-        // 在相同出場次數的選手中隨機打亂
-        const countGroups = {};
-        selectedForGame.forEach(player => {
+      } else if (balanceMode === 'normal') {
+        // 一般模式：考慮出場次數和簡單隨機性
+        const playersByCount = {};
+        selectedPlayers.forEach(player => {
           const playCount = count[player] || 0;
-          if (!countGroups[playCount]) {
-            countGroups[playCount] = [];
+          if (!playersByCount[playCount]) {
+            playersByCount[playCount] = [];
           }
-          countGroups[playCount].push(player);
+          playersByCount[playCount].push(player);
         });
 
+        // 按照出場次數從少到多選擇選手
         selectedForGame = [];
-        Object.values(countGroups).forEach(group => {
-          for (let i = group.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [group[i], group[j]] = [group[j], group[i]];
+        const counts = Object.keys(playersByCount).map(Number).sort((a, b) => a - b);
+        
+        while (selectedForGame.length < groupSize && counts.length > 0) {
+          const currentCount = counts[0];
+          const availablePlayers = playersByCount[currentCount];
+          
+          while (selectedForGame.length < groupSize && availablePlayers.length > 0) {
+            const randomIndex = Math.floor(Math.random() * availablePlayers.length);
+            selectedForGame.push(availablePlayers.splice(randomIndex, 1)[0]);
           }
-          selectedForGame = selectedForGame.concat(group);
-        });
+          
+          if (availablePlayers.length === 0) {
+            counts.shift();
+          }
+        }
 
-        // 最後再隨機打亂整體順序來決定分組
+        // 隨機打亂最終順序
         for (let i = selectedForGame.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
           [selectedForGame[i], selectedForGame[j]] = [selectedForGame[j], selectedForGame[i]];
         }
+      } else {
+        // 完全隨機模式
+        selectedForGame = selectedPlayers
+          .sort(() => Math.random() - 0.5)
+          .slice(0, groupSize);
       }
 
       // 更新出場次數
