@@ -145,12 +145,54 @@
       margin-top: 20px;
     }
 
+    .button-group.three-columns {
+      grid-template-columns: 1fr 1fr 1fr;
+    }
+
     .danger-button {
       background: #ff5252;
     }
 
     .danger-button:hover {
       background: #ff1744;
+    }
+
+    .group-size {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 20px 0;
+    }
+
+    .group-size input {
+      width: 60px;
+      text-align: center;
+    }
+
+    .history-item {
+      background: #333;
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 8px;
+      font-size: 0.9em;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .history-item .time {
+      color: #888;
+      font-size: 0.8em;
+    }
+
+    .select-all-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 15px;
+      padding: 10px;
+      background: #333;
+      border-radius: 8px;
     }
   </style>
 </head>
@@ -165,11 +207,26 @@
 
   <div class="container">
     <h2>👥 選手名單</h2>
-    <ul id="playerList"></ul>
-    <div class="button-group">
-      <button onclick="removeSelectedPlayers()" class="danger-button">🗑️ 移除勾選選手</button>
-      <button onclick="generateGroup()">🎲 為勾選的選手分組</button>
+    <div class="select-all-container">
+      <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+      <label for="selectAll">全選/取消全選</label>
     </div>
+    <ul id="playerList"></ul>
+    <div class="button-group three-columns">
+      <button onclick="removeSelectedPlayers()" class="danger-button">🗑️ 移除勾選</button>
+      <button onclick="exportPlayers()">💾 匯出名單</button>
+      <button onclick="document.getElementById('importFile').click()">📂 匯入名單</button>
+      <input type="file" id="importFile" style="display: none" onchange="importPlayers(event)">
+    </div>
+  </div>
+
+  <div class="container">
+    <h2>🎲 分組設定</h2>
+    <div class="group-size">
+      <label for="groupSize">每組人數：</label>
+      <input type="number" id="groupSize" value="4" min="2" max="10">
+    </div>
+    <button onclick="generateGroup()">開始分組</button>
   </div>
 
   <div class="container">
@@ -183,13 +240,199 @@
     <button onclick="clearData()">🔄 重置出場次數統計</button>
   </div>
 
+  <div class="container">
+    <h2>📜 歷史紀錄</h2>
+    <ul id="historyList"></ul>
+  </div>
+
   <script>
     let players = JSON.parse(localStorage.getItem('players')) || [];
     let count = JSON.parse(localStorage.getItem('count')) || {};
+    let history = JSON.parse(localStorage.getItem('history')) || [];
 
     function saveData() {
       localStorage.setItem('players', JSON.stringify(players));
       localStorage.setItem('count', JSON.stringify(count));
+      localStorage.setItem('history', JSON.stringify(history));
+    }
+
+    function toggleSelectAll() {
+      const selectAll = document.getElementById('selectAll');
+      const checkboxes = document.querySelectorAll('#playerList input[type="checkbox"]');
+      checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll.checked;
+      });
+    }
+
+    function exportPlayers() {
+      const data = {
+        players: players,
+        count: count
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = '羽球分組_' + new Date().toLocaleDateString() + '.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function importPlayers(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            const data = JSON.parse(e.target.result);
+            if (data.players && data.count) {
+              players = data.players;
+              count = data.count;
+              saveData();
+              renderList();
+              alert('✅ 匯入成功！');
+            }
+          } catch (error) {
+            alert('❌ 檔案格式錯誤！');
+          }
+        };
+        reader.readAsText(file);
+      }
+    }
+
+    function addToHistory(group) {
+      const now = new Date();
+      const historyItem = {
+        time: now.toLocaleString(),
+        group: group
+      };
+      history.unshift(historyItem);
+      if (history.length > 10) {
+        history.pop();
+      }
+      saveData();
+      renderHistory();
+    }
+
+    function renderHistory() {
+      const historyList = document.getElementById('historyList');
+      historyList.innerHTML = '';
+      history.forEach(item => {
+        const li = document.createElement('li');
+        li.className = 'history-item';
+        li.innerHTML = `
+          <div>
+            <span class="highlight">${item.group[0]}</span> & 
+            <span class="highlight">${item.group[1]}</span> 
+            <span class="vs-text">VS</span> 
+            <span class="highlight-team2">${item.group[2]}</span> & 
+            <span class="highlight-team2">${item.group[3]}</span>
+          </div>
+          <div class="time">${item.time}</div>
+        `;
+        historyList.appendChild(li);
+      });
+    }
+
+    function generateGroup() {
+      const checkboxes = document.querySelectorAll('#playerList input[type="checkbox"]:checked');
+      const selectedPlayers = Array.from(checkboxes).map(cb => cb.value);
+      const groupSize = parseInt(document.getElementById('groupSize').value) || 4;
+      
+      if (selectedPlayers.length < groupSize) {
+        alert(`至少需要勾選 ${groupSize} 名選手才可以分組`);
+        return;
+      }
+
+      // 計算平均出場次數
+      const totalCount = selectedPlayers.reduce((sum, player) => sum + (count[player] || 0), 0);
+      const averageCount = totalCount / selectedPlayers.length;
+
+      // 根據與平均值的差距進行加權
+      const weightedPlayers = selectedPlayers.map(player => ({
+        name: player,
+        count: count[player] || 0,
+        // 出場次數越接近平均值，權重越高
+        weight: 1 / (Math.abs((count[player] || 0) - averageCount) + 1)
+      }));
+
+      // 使用加權隨機選擇
+      function weightedRandomSelect(players) {
+        const totalWeight = players.reduce((sum, p) => sum + p.weight, 0);
+        let random = Math.random() * totalWeight;
+        
+        for (const player of players) {
+          random -= player.weight;
+          if (random <= 0) {
+            return player;
+          }
+        }
+        return players[0];
+      }
+
+      // 檢查是否為最近的組合
+      function isRecentCombination(team1, team2) {
+        const last3Games = history.slice(0, 3);
+        return last3Games.some(game => {
+          const gameTeam1 = game.group.slice(0, team1.length);
+          const gameTeam2 = game.group.slice(team1.length);
+          
+          const team1Match = team1.every(p => gameTeam1.includes(p));
+          const team2Match = team2.every(p => gameTeam2.includes(p));
+          
+          return team1Match && team2Match;
+        });
+      }
+
+      // 嘗試生成不重複的分組
+      let attempts = 0;
+      let group;
+      let team1;
+      let team2;
+      const maxAttempts = 10;
+
+      do {
+        // 複製玩家列表以進行選擇
+        let availablePlayers = [...weightedPlayers];
+        group = [];
+
+        // 選擇玩家
+        while (group.length < groupSize && availablePlayers.length > 0) {
+          const selected = weightedRandomSelect(availablePlayers);
+          group.push(selected.name);
+          availablePlayers = availablePlayers.filter(p => p.name !== selected.name);
+        }
+
+        // 分成兩隊
+        const halfSize = Math.floor(groupSize / 2);
+        team1 = group.slice(0, halfSize);
+        team2 = group.slice(halfSize);
+
+        attempts++;
+      } while (isRecentCombination(team1, team2) && attempts < maxAttempts);
+
+      // 更新出場次數
+      group.forEach(name => {
+        count[name] = (count[name] || 0) + 1;
+      });
+      saveData();
+
+      // 顯示結果
+      const result = document.getElementById('groupResult');
+      result.innerHTML = '';
+      const li = document.createElement('li');
+      
+      li.innerHTML = `
+        ${team1.map(p => `<span class="highlight">${p}</span>`).join(' & ')} 
+        <span class="vs-text">VS</span> 
+        ${team2.map(p => `<span class="highlight-team2">${p}</span>`).join(' & ')}
+      `;
+      result.appendChild(li);
+      
+      addToHistory(group);
+      renderList(selectedPlayers);
     }
 
     function renderList(selectedPlayers = []) {
@@ -206,6 +449,11 @@
         list.appendChild(li);
       });
 
+      const selectAll = document.getElementById('selectAll');
+      const checkboxes = document.querySelectorAll('#playerList input[type="checkbox"]');
+      selectAll.checked = checkboxes.length > 0 && 
+        Array.from(checkboxes).every(cb => cb.checked);
+
       const countList = document.getElementById('countList');
       countList.innerHTML = '';
       const sorted = [...players].sort((a, b) => (count[b] || 0) - (count[a] || 0));
@@ -216,21 +464,6 @@
       });
     }
 
-    function addPlayers() {
-      const input = document.getElementById('newPlayers').value;
-      const newNames = input.split(/[\n,]+/).map(s => s.trim()).filter(s => s);
-      newNames.forEach(name => {
-        if (!players.includes(name)) {
-          players.push(name);
-          count[name] = 0;
-        }
-      });
-      saveData();
-      renderList();
-      document.getElementById('newPlayers').value = '';
-      alert('✅ 已新增成功！');
-    }
-
     function removeSelectedPlayers() {
       const checkboxes = document.querySelectorAll('#playerList input[type="checkbox"]:checked');
       const selectedPlayers = Array.from(checkboxes).map(cb => cb.value);
@@ -239,67 +472,6 @@
       saveData();
       renderList();
       alert('已移除勾選選手');
-    }
-
-    function generateGroup() {
-      const checkboxes = document.querySelectorAll('#playerList input[type="checkbox"]:checked');
-      const selectedPlayers = Array.from(checkboxes).map(cb => cb.value);
-      
-      if (selectedPlayers.length < 4) {
-        alert('至少需要勾選 4 名選手才可以分組');
-        return;
-      }
-
-      // 根據出場次數分組
-      const playersByCount = {};
-      selectedPlayers.forEach(player => {
-        const playCount = count[player] || 0;
-        if (!playersByCount[playCount]) {
-          playersByCount[playCount] = [];
-        }
-        playersByCount[playCount].push(player);
-      });
-
-      // 獲取所有出場次數並排序
-      const playCounts = Object.keys(playersByCount).map(Number).sort((a, b) => a - b);
-      
-      // 優先從出場次數較少的組中選擇，但在每組內隨機打亂
-      let group = [];
-      while (group.length < 4) {
-        // 從最少場次開始選擇
-        for (const count of playCounts) {
-          if (playersByCount[count] && playersByCount[count].length > 0) {
-            // 隨機打亂該場次的選手
-            playersByCount[count] = playersByCount[count].sort(() => Math.random() - 0.5);
-            // 選擇一名選手
-            const player = playersByCount[count].pop();
-            group.push(player);
-            // 如果該場次沒有選手了，刪除該場次
-            if (playersByCount[count].length === 0) {
-              delete playersByCount[count];
-            }
-            // 如果已經選夠 4 人，跳出循環
-            if (group.length === 4) break;
-          }
-        }
-      }
-
-      // 再次隨機打亂最終選出的 4 人分組
-      group = group.sort(() => Math.random() - 0.5);
-      
-      // 更新出場次數
-      group.forEach(name => {
-        count[name] = (count[name] || 0) + 1;
-      });
-      saveData();
-
-      const result = document.getElementById('groupResult');
-      result.innerHTML = '';
-      const li = document.createElement('li');
-      li.innerHTML = `<span class="highlight">${group[0]}</span> & <span class="highlight">${group[1]}</span> <span class="vs-text">VS</span> <span class="highlight-team2">${group[2]}</span> & <span class="highlight-team2">${group[3]}</span>`;
-      result.appendChild(li);
-      
-      renderList(selectedPlayers);
     }
 
     function clearData() {
@@ -318,6 +490,7 @@
     }
 
     renderList();
+    renderHistory();
   </script>
 </body>
 </html>
