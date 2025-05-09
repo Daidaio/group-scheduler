@@ -249,11 +249,45 @@
         alert('至少需要勾選 4 名選手才可以分組');
         return;
       }
+
+      // 根據出場次數分組
+      const playersByCount = {};
+      selectedPlayers.forEach(player => {
+        const playCount = count[player] || 0;
+        if (!playersByCount[playCount]) {
+          playersByCount[playCount] = [];
+        }
+        playersByCount[playCount].push(player);
+      });
+
+      // 獲取所有出場次數並排序
+      const playCounts = Object.keys(playersByCount).map(Number).sort((a, b) => a - b);
       
-      // 公平性演算法：優先選擇出場次數較少的選手
-      const sortedPlayers = [...selectedPlayers].sort((a, b) => (count[a] || 0) - (count[b] || 0));
-      const group = sortedPlayers.slice(0, 4);
+      // 優先從出場次數較少的組中選擇，但在每組內隨機打亂
+      let group = [];
+      while (group.length < 4) {
+        // 從最少場次開始選擇
+        for (const count of playCounts) {
+          if (playersByCount[count] && playersByCount[count].length > 0) {
+            // 隨機打亂該場次的選手
+            playersByCount[count] = playersByCount[count].sort(() => Math.random() - 0.5);
+            // 選擇一名選手
+            const player = playersByCount[count].pop();
+            group.push(player);
+            // 如果該場次沒有選手了，刪除該場次
+            if (playersByCount[count].length === 0) {
+              delete playersByCount[count];
+            }
+            // 如果已經選夠 4 人，跳出循環
+            if (group.length === 4) break;
+          }
+        }
+      }
+
+      // 再次隨機打亂最終選出的 4 人分組
+      group = group.sort(() => Math.random() - 0.5);
       
+      // 更新出場次數
       group.forEach(name => {
         count[name] = (count[name] || 0) + 1;
       });
