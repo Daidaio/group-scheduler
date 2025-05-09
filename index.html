@@ -67,8 +67,7 @@
 
   <h2>選手名單：</h2>
   <ul id="playerList"></ul>
-
-  <button onclick="generateGroup()">隨機分組（4 人）</button>
+  <button onclick="removeSelectedPlayers()">移除勾選選手</button>
 
   <h2>分組結果：</h2>
   <ul id="groupResult"></ul>
@@ -92,7 +91,11 @@
       list.innerHTML = '';
       players.forEach(p => {
         const li = document.createElement('li');
-        li.textContent = p;
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = p;
+        li.appendChild(checkbox);
+        li.appendChild(document.createTextNode(' ' + p));
         list.appendChild(li);
       });
 
@@ -121,13 +124,24 @@
       alert('✅ 已新增成功！');
     }
 
+    function removeSelectedPlayers() {
+      const checkboxes = document.querySelectorAll('#playerList input[type="checkbox"]:checked');
+      const selectedPlayers = Array.from(checkboxes).map(cb => cb.value);
+      players = players.filter(p => !selectedPlayers.includes(p));
+      selectedPlayers.forEach(p => delete count[p]);
+      saveData();
+      renderList();
+      alert('已移除勾選選手');
+    }
+
     function generateGroup() {
       if (players.length < 4) {
         alert('至少需要 4 名選手才可以分組');
         return;
       }
-      const shuffled = [...players].sort(() => 0.5 - Math.random());
-      const group = shuffled.slice(0, 4);
+      // 公平性演算法：優先選擇出場次數較少的選手
+      const sortedPlayers = [...players].sort((a, b) => (count[a] || 0) - (count[b] || 0));
+      const group = sortedPlayers.slice(0, 4);
       group.forEach(name => {
         count[name] = (count[name] || 0) + 1;
       });
