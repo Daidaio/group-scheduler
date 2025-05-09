@@ -564,46 +564,120 @@
       const checkboxes = document.querySelectorAll('#playerList input[type="checkbox"]:checked');
       const selectedPlayers = Array.from(checkboxes).map(cb => cb.value);
       const groupSize = parseInt(document.getElementById('groupSize').value) || 4;
+      const balanceMode = document.getElementById('balanceMode').value;
       
       if (selectedPlayers.length < groupSize) {
         alert(`至少需要勾選 ${groupSize} 名選手才可以分組`);
         return;
       }
 
-      // 根據出場次數排序選手
-      const sortedPlayers = selectedPlayers.sort((a, b) => {
-        const countA = count[a] || 0;
-        const countB = count[b] || 0;
-        return countA - countB;
-      });
+      let selectedForGame;
 
-      // 優先選擇出場次數最少的選手
-      let selectedForGame = sortedPlayers.slice(0, groupSize);
-      
-      // 如果有相同出場次數的選手，隨機打亂他們的順序
-      const countGroups = {};
-      selectedForGame.forEach(player => {
-        const playCount = count[player] || 0;
-        if (!countGroups[playCount]) {
-          countGroups[playCount] = [];
+      if (balanceMode === 'strict') {
+        // 計算每個選手和其他選手一起打球的次數
+        const teamHistory = {};
+        selectedPlayers.forEach(p1 => {
+          teamHistory[p1] = {};
+          selectedPlayers.forEach(p2 => {
+            if (p1 !== p2) {
+              teamHistory[p1][p2] = 0;
+            }
+          });
+        });
+
+        // 從歷史記錄中統計搭配次數
+        history.forEach(record => {
+          const team1 = record.group.slice(0, record.group.length / 2);
+          const team2 = record.group.slice(record.group.length / 2);
+          
+          // 統計隊友次數
+          team1.forEach(p1 => {
+            team1.forEach(p2 => {
+              if (p1 !== p2 && teamHistory[p1] && teamHistory[p1][p2]) {
+                teamHistory[p1][p2]++;
+                teamHistory[p2][p1]++;
+              }
+            });
+          });
+          
+          team2.forEach(p1 => {
+            team2.forEach(p2 => {
+              if (p1 !== p2 && teamHistory[p1] && teamHistory[p1][p2]) {
+                teamHistory[p1][p2]++;
+                teamHistory[p2][p1]++;
+              }
+            });
+          });
+        });
+
+        // 根據出場次數和搭配歷史排序選手
+        const sortedPlayers = selectedPlayers.sort((a, b) => {
+          const countA = count[a] || 0;
+          const countB = count[b] || 0;
+          if (countA !== countB) {
+            return countA - countB;
+          }
+          // 如果出場次數相同，比較與其他選手的搭配次數總和
+          const teamCountA = Object.values(teamHistory[a]).reduce((sum, c) => sum + c, 0);
+          const teamCountB = Object.values(teamHistory[b]).reduce((sum, c) => sum + c, 0);
+          return teamCountA - teamCountB;
+        });
+
+        selectedForGame = sortedPlayers.slice(0, groupSize);
+
+        // 根據搭配歷史分配隊伍
+        const halfSize = Math.floor(groupSize / 2);
+        const team1 = [selectedForGame[0]];
+        const team2 = [selectedForGame[1]];
+
+        // 依次將剩餘選手分配到搭配次數較少的隊伍
+        for (let i = 2; i < selectedForGame.length; i++) {
+          const player = selectedForGame[i];
+          const team1Score = team1.reduce((sum, p) => sum + (teamHistory[player][p] || 0), 0);
+          const team2Score = team2.reduce((sum, p) => sum + (teamHistory[player][p] || 0), 0);
+
+          if (team1.length < halfSize && (team2.length >= halfSize || team1Score <= team2Score)) {
+            team1.push(player);
+          } else {
+            team2.push(player);
+          }
         }
-        countGroups[playCount].push(player);
-      });
 
-      // 在相同出場次數的選手中隨機打亂
-      selectedForGame = [];
-      Object.values(countGroups).forEach(group => {
-        for (let i = group.length - 1; i > 0; i--) {
+        selectedForGame = [...team1, ...team2];
+      } else {
+        // 一般模式：只考慮出場次數
+        const sortedPlayers = selectedPlayers.sort((a, b) => {
+          const countA = count[a] || 0;
+          const countB = count[b] || 0;
+          return countA - countB;
+        });
+
+        selectedForGame = sortedPlayers.slice(0, groupSize);
+        
+        // 在相同出場次數的選手中隨機打亂
+        const countGroups = {};
+        selectedForGame.forEach(player => {
+          const playCount = count[player] || 0;
+          if (!countGroups[playCount]) {
+            countGroups[playCount] = [];
+          }
+          countGroups[playCount].push(player);
+        });
+
+        selectedForGame = [];
+        Object.values(countGroups).forEach(group => {
+          for (let i = group.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [group[i], group[j]] = [group[j], group[i]];
+          }
+          selectedForGame = selectedForGame.concat(group);
+        });
+
+        // 最後再隨機打亂整體順序來決定分組
+        for (let i = selectedForGame.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
-          [group[i], group[j]] = [group[j], group[i]];
+          [selectedForGame[i], selectedForGame[j]] = [selectedForGame[j], selectedForGame[i]];
         }
-        selectedForGame = selectedForGame.concat(group);
-      });
-
-      // 最後再隨機打亂整體順序來決定分組
-      for (let i = selectedForGame.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [selectedForGame[i], selectedForGame[j]] = [selectedForGame[j], selectedForGame[i]];
       }
 
       // 更新出場次數
@@ -682,18 +756,15 @@
       alert('已移除勾選選手');
     }
 
-    function clearData() {
-      if (confirm('確定要重置所有選手的出場次數統計嗎？')) {
-        const checkboxes = document.querySelectorAll('#playerList input[type="checkbox"]:checked');
-        const selectedPlayers = Array.from(checkboxes).map(cb => cb.value);
-        localStorage.removeItem('count');
-        count = {};
+    function clearPlayCount() {
+      if (confirm('確定要清除所有選手的出場次數統計嗎？')) {
         players.forEach(player => {
           count[player] = 0;
         });
         saveData();
-        renderList(selectedPlayers);
-        document.getElementById('groupResult').innerHTML = '';
+        renderList();
+        updateStats();
+        alert('✅ 已重置所有出場次數！');
       }
     }
 
