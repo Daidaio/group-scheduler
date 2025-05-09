@@ -88,7 +88,7 @@
       localStorage.setItem('count', JSON.stringify(count));
     }
 
-    function renderList() {
+    function renderList(selectedPlayers = []) {
       const list = document.getElementById('playerList');
       list.innerHTML = '';
       players.forEach(p => {
@@ -96,6 +96,7 @@
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.value = p;
+        checkbox.checked = selectedPlayers.includes(p);
         li.appendChild(checkbox);
         li.appendChild(document.createTextNode(' ' + p));
         list.appendChild(li);
@@ -161,18 +162,20 @@
         li.innerHTML = `<span class="highlight">${p}</span>`;
         result.appendChild(li);
       });
-      renderList();
+      renderList(selectedPlayers);
     }
 
     function clearData() {
       if (confirm('確定要重置所有選手的出場次數統計嗎？')) {
+        const checkboxes = document.querySelectorAll('#playerList input[type="checkbox"]:checked');
+        const selectedPlayers = Array.from(checkboxes).map(cb => cb.value);
         localStorage.removeItem('count');
         count = {};
         players.forEach(player => {
           count[player] = 0;
         });
         saveData();
-        renderList();
+        renderList(selectedPlayers);
         document.getElementById('groupResult').innerHTML = '';
       }
     }
