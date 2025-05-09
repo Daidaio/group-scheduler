@@ -360,6 +360,9 @@
             <option value="random">完全隨機</option>
           </select>
         </div>
+        <div class="option-card">
+          <button onclick="clearPlayCount()" class="danger-button" style="margin-top: 0">🔄 重置出場次數</button>
+        </div>
       </div>
       <button onclick="generateGroup()">開始分組</button>
       <div id="groupResult"></div>
@@ -594,8 +597,8 @@
           team1.forEach(p1 => {
             team1.forEach(p2 => {
               if (p1 !== p2 && teamHistory[p1] && teamHistory[p1][p2]) {
-                teamHistory[p1][p2]++;
-                teamHistory[p2][p1]++;
+                teamHistory[p1][p2] += 2; // 增加權重，讓系統更傾向避免重複配對
+                teamHistory[p2][p1] += 2;
               }
             });
           });
@@ -603,8 +606,18 @@
           team2.forEach(p1 => {
             team2.forEach(p2 => {
               if (p1 !== p2 && teamHistory[p1] && teamHistory[p1][p2]) {
-                teamHistory[p1][p2]++;
-                teamHistory[p2][p1]++;
+                teamHistory[p1][p2] += 2;
+                teamHistory[p2][p1] += 2;
+              }
+            });
+          });
+
+          // 統計對手次數（較低權重）
+          team1.forEach(p1 => {
+            team2.forEach(p2 => {
+              if (teamHistory[p1] && teamHistory[p1][p2]) {
+                teamHistory[p1][p2] += 1;
+                teamHistory[p2][p1] += 1;
               }
             });
           });
@@ -614,10 +627,10 @@
         const sortedPlayers = selectedPlayers.sort((a, b) => {
           const countA = count[a] || 0;
           const countB = count[b] || 0;
-          if (countA !== countB) {
+          if (Math.abs(countA - countB) > 2) { // 如果場次差距大於2，優先考慮場次
             return countA - countB;
           }
-          // 如果出場次數相同，比較與其他選手的搭配次數總和
+          // 場次相近時，考慮搭配歷史
           const teamCountA = Object.values(teamHistory[a]).reduce((sum, c) => sum + c, 0);
           const teamCountB = Object.values(teamHistory[b]).reduce((sum, c) => sum + c, 0);
           return teamCountA - teamCountB;
@@ -625,25 +638,50 @@
 
         selectedForGame = sortedPlayers.slice(0, groupSize);
 
-        // 根據搭配歷史分配隊伍
+        // 使用更智能的隊伍分配算法
         const halfSize = Math.floor(groupSize / 2);
-        const team1 = [selectedForGame[0]];
-        const team2 = [selectedForGame[1]];
+        let bestTeams = null;
+        let lowestScore = Infinity;
 
-        // 依次將剩餘選手分配到搭配次數較少的隊伍
-        for (let i = 2; i < selectedForGame.length; i++) {
-          const player = selectedForGame[i];
-          const team1Score = team1.reduce((sum, p) => sum + (teamHistory[player][p] || 0), 0);
-          const team2Score = team2.reduce((sum, p) => sum + (teamHistory[player][p] || 0), 0);
+        // 嘗試多次分組，找出最佳組合
+        for (let attempt = 0; attempt < 20; attempt++) {
+          const shuffled = [...selectedForGame];
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          }
 
-          if (team1.length < halfSize && (team2.length >= halfSize || team1Score <= team2Score)) {
-            team1.push(player);
-          } else {
-            team2.push(player);
+          const team1 = shuffled.slice(0, halfSize);
+          const team2 = shuffled.slice(halfSize);
+
+          // 計算這個組合的分數（越低越好）
+          let score = 0;
+
+          // 計算隊友間的歷史配對分數
+          team1.forEach(p1 => {
+            team1.forEach(p2 => {
+              if (p1 !== p2) {
+                score += teamHistory[p1][p2] * 2; // 隊友歷史權重加倍
+              }
+            });
+          });
+
+          team2.forEach(p1 => {
+            team2.forEach(p2 => {
+              if (p1 !== p2) {
+                score += teamHistory[p1][p2] * 2;
+              }
+            });
+          });
+
+          // 如果找到更好的組合，就更新
+          if (score < lowestScore) {
+            lowestScore = score;
+            bestTeams = [team1, team2];
           }
         }
 
-        selectedForGame = [...team1, ...team2];
+        selectedForGame = [...bestTeams[0], ...bestTeams[1]];
       } else {
         // 一般模式：只考慮出場次數
         const sortedPlayers = selectedPlayers.sort((a, b) => {
