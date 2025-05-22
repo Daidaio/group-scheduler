@@ -2,39 +2,40 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>隨機分組器</title>
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
       background-color: #1e1e1e;
       color: #f0f0f0;
-      padding: 40px;
-      max-width: 800px;
+      padding: 15px;
+      max-width: 100%;
       margin: auto;
       line-height: 1.6;
     }
 
     .container {
       background: #2a2a2a;
-      padding: 30px;
+      padding: 20px;
       border-radius: 15px;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-      margin-bottom: 30px;
+      margin-bottom: 20px;
     }
 
     h1 {
       text-align: center;
       color: #4fc3f7;
-      font-size: 2.5em;
-      margin-bottom: 40px;
+      font-size: 1.8em;
+      margin-bottom: 20px;
       text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     }
 
     h2 {
       color: #4fc3f7;
-      font-size: 1.5em;
-      margin-top: 30px;
-      margin-bottom: 15px;
+      font-size: 1.3em;
+      margin-top: 20px;
+      margin-bottom: 10px;
       padding-bottom: 10px;
       border-bottom: 2px solid #444;
     }
@@ -47,7 +48,7 @@
       color: #fff;
       border: 2px solid #555;
       border-radius: 8px;
-      font-size: 14px;
+      font-size: 16px;
       transition: all 0.3s ease;
     }
 
@@ -65,7 +66,7 @@
       border-radius: 8px;
       font-size: 16px;
       font-weight: bold;
-      margin-top: 20px;
+      margin-top: 15px;
       cursor: pointer;
       transition: all 0.3s ease;
       width: 100%;
@@ -86,7 +87,7 @@
     ul {
       list-style: none;
       padding: 0;
-      margin: 20px 0;
+      margin: 15px 0;
     }
 
     li {
@@ -102,7 +103,6 @@
 
     li:hover {
       background: #3a3a3a;
-      transform: translateX(5px);
     }
 
     .highlight {
@@ -118,35 +118,47 @@
     .vs-text {
       color: #4fc3f7;
       font-weight: bold;
-      margin: 0 15px;
+      margin: 0 10px;
       font-size: 1.2em;
     }
 
     #groupResult li {
-      font-size: 1.2em;
+      font-size: 1.1em;
       text-align: center;
-      padding: 20px;
+      padding: 15px;
       background: #333;
       border: 2px solid #444;
-      margin: 20px 0;
+      margin: 15px 0;
     }
 
     input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
+      width: 20px;
+      height: 20px;
       margin-right: 10px;
       cursor: pointer;
     }
 
     .button-group {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 15px;
-      margin-top: 20px;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    @media (min-width: 480px) {
+      .button-group {
+        grid-template-columns: 1fr 1fr;
+      }
     }
 
     .button-group.three-columns {
-      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-columns: 1fr;
+    }
+
+    @media (min-width: 480px) {
+      .button-group.three-columns {
+        grid-template-columns: 1fr 1fr 1fr;
+      }
     }
 
     .danger-button {
@@ -161,7 +173,7 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      margin: 20px 0;
+      margin: 15px 0;
     }
 
     .group-size input {
@@ -176,8 +188,16 @@
       border-radius: 8px;
       font-size: 0.9em;
       display: flex;
-      justify-content: space-between;
-      align-items: center;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    @media (min-width: 480px) {
+      .history-item {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+      }
     }
 
     .history-item .time {
@@ -197,8 +217,8 @@
 
     .stats-container {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 15px;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 10px;
       margin-top: 15px;
     }
 
@@ -222,19 +242,22 @@
     }
 
     .tabs {
-      display: flex;
-      gap: 10px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 5px;
       margin-bottom: 20px;
     }
 
     .tab {
-      padding: 10px 20px;
+      padding: 10px 5px;
       background: #333;
       border: none;
       border-radius: 8px;
       color: #fff;
       cursor: pointer;
       transition: all 0.3s ease;
+      font-size: 14px;
+      text-align: center;
     }
 
     .tab.active {
@@ -252,9 +275,9 @@
 
     .chart-container {
       background: #333;
-      padding: 20px;
+      padding: 15px;
       border-radius: 8px;
-      margin-top: 20px;
+      margin-top: 15px;
     }
 
     .player-bar {
@@ -266,20 +289,31 @@
 
     .bar {
       background: #4fc3f7;
-      height: 20px;
+      height: 18px;
       border-radius: 4px;
       transition: width 0.3s ease;
+      flex-grow: 1;
     }
 
     .bar-label {
-      min-width: 100px;
+      min-width: 65px;
+      font-size: 14px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .options-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      grid-template-columns: 1fr;
       gap: 10px;
       margin: 15px 0;
+    }
+
+    @media (min-width: 480px) {
+      .options-grid {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      }
     }
 
     .option-card {
@@ -290,23 +324,73 @@
     }
 
     .quick-actions {
-      display: flex;
-      gap: 10px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px;
       margin: 15px 0;
+    }
+
+    @media (min-width: 480px) {
+      .quick-actions {
+        display: flex;
+        gap: 10px;
+      }
     }
 
     .quick-action-btn {
       background: #333;
       border: none;
-      padding: 8px 15px;
+      padding: 8px 10px;
       border-radius: 4px;
       color: #fff;
       cursor: pointer;
       font-size: 0.9em;
+      text-align: center;
     }
 
     .quick-action-btn:hover {
       background: #444;
+    }
+
+    /* 增加觸控優化 */
+    input, button, .tab, .quick-action-btn {
+      touch-action: manipulation;
+    }
+    
+    /* 增加選擇框大小 */
+    select, input[type="number"] {
+      font-size: 16px;
+      padding: 10px;
+      width: 100%;
+      background: #333;
+      color: #fff;
+      border: 1px solid #555;
+      border-radius: 8px;
+    }
+    
+    /* 防止內容溢出 */
+    * {
+      box-sizing: border-box;
+      max-width: 100%;
+    }
+    
+    /* 分組結果樣式 */
+    .team-display {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    @media (min-width: 480px) {
+      .team-display {
+        flex-direction: row;
+        justify-content: center;
+      }
+    }
+    
+    .team-members {
+      text-align: center;
     }
   </style>
 </head>
@@ -738,9 +822,11 @@
       const team2 = selectedForGame.slice(halfSize, groupSize);
 
       li.innerHTML = `
-        ${team1.map(p => `<span class="highlight">${p}</span>`).join(' & ')} 
-        <span class="vs-text">VS</span> 
-        ${team2.map(p => `<span class="highlight-team2">${p}</span>`).join(' & ')}
+        <div class="team-display">
+          <div class="team-members">${team1.map(p => `<span class="highlight">${p}</span>`).join(' & ')}</div>
+          <div class="vs-text">VS</div>
+          <div class="team-members">${team2.map(p => `<span class="highlight-team2">${p}</span>`).join(' & ')}</div>
+        </div>
       `;
       result.appendChild(li);
       
@@ -768,8 +854,23 @@
         checkbox.type = 'checkbox';
         checkbox.value = p;
         checkbox.checked = selectedPlayers.includes(p);
+        checkbox.id = `player-${p.replace(/\s+/g, '-')}`;
+        
+        const label = document.createElement('label');
+        label.htmlFor = checkbox.id;
+        label.style.flexGrow = '1';
+        label.style.paddingLeft = '5px';
+        label.style.cursor = 'pointer';
+        label.textContent = p;
+        
+        const playCount = document.createElement('span');
+        playCount.textContent = `${count[p] || 0} 場`;
+        playCount.style.fontSize = '0.8em';
+        playCount.style.color = '#888';
+        
         li.appendChild(checkbox);
-        li.appendChild(document.createTextNode(' ' + p));
+        li.appendChild(label);
+        li.appendChild(playCount);
         list.appendChild(li);
       });
 
@@ -777,15 +878,6 @@
       const checkboxes = document.querySelectorAll('#playerList input[type="checkbox"]');
       selectAll.checked = checkboxes.length > 0 && 
         Array.from(checkboxes).every(cb => cb.checked);
-
-      const countList = document.getElementById('countList');
-      countList.innerHTML = '';
-      const sorted = [...players].sort((a, b) => (count[b] || 0) - (count[a] || 0));
-      sorted.forEach(p => {
-        const li = document.createElement('li');
-        li.innerHTML = `${p} : ${(count[p] || 0)} 場`;
-        countList.appendChild(li);
-      });
     }
 
     function removeSelectedPlayers() {
