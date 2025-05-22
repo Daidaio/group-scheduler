@@ -571,6 +571,104 @@
       margin-top: 5px;
       text-align: center;
     }
+    
+    /* 配對分析相關樣式 */
+    .pairing-matrix {
+      width: 100%;
+      overflow-x: auto;
+      margin-top: 20px;
+    }
+    
+    .matrix-table {
+      border-collapse: collapse;
+      width: 100%;
+      min-width: 600px;
+      background: #333;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    
+    .matrix-table th, .matrix-table td {
+      padding: 10px;
+      text-align: center;
+      border: 1px solid #444;
+    }
+    
+    .matrix-table th {
+      background: #444;
+      color: #fff;
+      position: sticky;
+      top: 0;
+    }
+    
+    .matrix-table th:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      background: #444;
+    }
+    
+    .matrix-table td:first-child {
+      position: sticky;
+      left: 0;
+      background: #444;
+      font-weight: bold;
+    }
+    
+    .matrix-value {
+      font-weight: bold;
+    }
+    
+    .high-value {
+      color: #55ff88;
+    }
+    
+    .medium-value {
+      color: #ffeb3b;
+    }
+    
+    .low-value {
+      color: #ff9955;
+    }
+    
+    .player-name {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100px;
+    }
+    
+    .analysis-legend {
+      display: flex;
+      gap: 15px;
+      margin: 15px 0;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    
+    .legend-color {
+      width: 15px;
+      height: 15px;
+      border-radius: 3px;
+    }
+    
+    .legend-high {
+      background-color: #55ff88;
+    }
+    
+    .legend-medium {
+      background-color: #ffeb3b;
+    }
+    
+    .legend-low {
+      background-color: #ff9955;
+    }
   </style>
 </head>
 <body>
@@ -581,6 +679,7 @@
       <button class="tab active" onclick="showTab('players')">👥 選手管理</button>
       <button class="tab" onclick="showTab('grouping')">🎲 分組</button>
       <button class="tab" onclick="showTab('pairing')">🔄 強弱配對</button>
+      <button class="tab" onclick="showTab('analysis')">📈 配對分析</button>
       <button class="tab" onclick="showTab('stats')">📊 統計</button>
     </div>
 
@@ -691,6 +790,37 @@
       
       <button onclick="generatePairing()">開始配對</button>
       <div id="pairingResult"></div>
+    </div>
+
+    <div id="analysis-tab" class="tab-content">
+      <h2>📈 配對分析</h2>
+      <div class="options-grid">
+        <div class="option-card">
+          <label for="analysisMode">分析模式</label>
+          <select id="analysisMode" onchange="analyzePairing()">
+            <option value="strength">強弱分析</option>
+            <option value="history">歷史配對分析</option>
+            <option value="ml">機器學習分析</option>
+          </select>
+        </div>
+        <div class="option-card">
+          <label for="analysisRange">分析範圍</label>
+          <select id="analysisRange" onchange="analyzePairing()">
+            <option value="recent">最近10場</option>
+            <option value="all">所有比賽</option>
+          </select>
+        </div>
+      </div>
+      <div class="info-box">
+        <h3>配對分析說明：</h3>
+        <ul>
+          <li><strong>強弱分析</strong>：檢視所有標記為強或弱的選手</li>
+          <li><strong>歷史配對分析</strong>：分析歷史上最常一起配對的選手組合</li>
+          <li><strong>機器學習分析</strong>：根據比賽結果，計算每位選手與其他選手一起配對時的勝率</li>
+        </ul>
+        <p>要使用機器學習分析，需要在分組後記錄比賽結果</p>
+      </div>
+      <div id="analysisResult"></div>
     </div>
 
     <div id="stats-tab" class="tab-content">
@@ -836,6 +966,15 @@
       // 如果是統計頁面，更新統計資訊
       if (tabName === 'stats') {
         updateStats();
+      }
+      
+      // 如果是分析頁面，預先載入資料
+      if (tabName === 'analysis') {
+        // 如果有機器學習的比賽記錄，預設顯示機器學習分析
+        if (matchResults.length > 0) {
+          document.getElementById('analysisMode').value = 'ml';
+          analyzePairing();
+        }
       }
     }
 
@@ -1869,6 +2008,303 @@
       
       // 隱藏結果記錄區
       document.getElementById('matchResultContainer').style.display = 'none';
+    }
+
+    function analyzePairing() {
+      const analysisMode = document.getElementById('analysisMode').value;
+      const analysisRange = document.getElementById('analysisRange').value;
+      const analysisResult = document.getElementById('analysisResult');
+      
+      // 清空結果區域
+      analysisResult.innerHTML = '';
+      
+      // 檢查是否有足夠數據
+      if (players.length === 0) {
+        analysisResult.innerHTML = '<p>沒有可分析的選手數據</p>';
+        return;
+      }
+      
+      if (analysisMode === 'ml') {
+        // 機器學習模式：分析配對勝率
+        if (matchResults.length === 0) {
+          analysisResult.innerHTML = '<p>沒有足夠的比賽記錄進行機器學習分析，請記錄更多比賽結果</p>';
+          return;
+        }
+        
+        // 篩選分析範圍的比賽記錄
+        let relevantMatches = matchResults;
+        if (analysisRange === 'recent') {
+          relevantMatches = matchResults.slice(0, 10);
+        }
+        
+        if (relevantMatches.length === 0) {
+          analysisResult.innerHTML = '<p>所選範圍內無比賽記錄</p>';
+          return;
+        }
+        
+        // 創建配對勝率矩陣
+        const pairingMatrix = calculatePairingMatrix(relevantMatches);
+        
+        // 創建圖例
+        const legend = document.createElement('div');
+        legend.className = 'analysis-legend';
+        legend.innerHTML = `
+          <div class="legend-item">
+            <div class="legend-color legend-high"></div>
+            <span>高勝率 (&gt;70%)</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color legend-medium"></div>
+            <span>中等勝率 (40-70%)</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color legend-low"></div>
+            <span>低勝率 (&lt;40%)</span>
+          </div>
+        `;
+        analysisResult.appendChild(legend);
+        
+        // 創建矩陣表格
+        const matrixContainer = document.createElement('div');
+        matrixContainer.className = 'pairing-matrix';
+        
+        const table = document.createElement('table');
+        table.className = 'matrix-table';
+        
+        // 表頭
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        headerRow.innerHTML = '<th>選手</th>';
+        
+        const relevantPlayers = Object.keys(pairingMatrix);
+        
+        relevantPlayers.forEach(player => {
+          headerRow.innerHTML += `<th class="player-name">${player}</th>`;
+        });
+        
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+        
+        // 表身
+        const tbody = document.createElement('tbody');
+        
+        relevantPlayers.forEach(player1 => {
+          const row = document.createElement('tr');
+          row.innerHTML = `<td class="player-name">${player1}</td>`;
+          
+          relevantPlayers.forEach(player2 => {
+            if (player1 === player2) {
+              row.innerHTML += '<td>-</td>';
+            } else {
+              const winRate = pairingMatrix[player1][player2] || 0;
+              let valueClass = '';
+              
+              if (winRate >= 0.7) {
+                valueClass = 'high-value';
+              } else if (winRate >= 0.4) {
+                valueClass = 'medium-value';
+              } else {
+                valueClass = 'low-value';
+              }
+              
+              row.innerHTML += `<td class="${valueClass}">${(winRate * 100).toFixed(0)}%</td>`;
+            }
+          });
+          
+          tbody.appendChild(row);
+        });
+        
+        table.appendChild(tbody);
+        matrixContainer.appendChild(table);
+        analysisResult.appendChild(matrixContainer);
+        
+        // 添加說明
+        const explanation = document.createElement('p');
+        explanation.className = 'small-tip';
+        explanation.innerHTML = '表格顯示每位選手(行)與其他選手(列)配對時的勝率。數據基於歷史比賽結果。';
+        analysisResult.appendChild(explanation);
+      } else if (analysisMode === 'strength') {
+        // 強弱分析
+        const strongPlayers = players.filter(p => playerStrength[p] === 'strong');
+        const weakPlayers = players.filter(p => playerStrength[p] === 'weak');
+        const normalPlayers = players.filter(p => !playerStrength[p] || playerStrength[p] === 'normal');
+        
+        const strengthAnalysis = document.createElement('div');
+        strengthAnalysis.innerHTML = `
+          <div class="stats-container">
+            <div class="stat-card">
+              <div class="stat-value">${strongPlayers.length}</div>
+              <div class="stat-label">強選手數量</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">${weakPlayers.length}</div>
+              <div class="stat-label">弱選手數量</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">${normalPlayers.length}</div>
+              <div class="stat-label">未標記選手</div>
+            </div>
+          </div>
+        `;
+        
+        // 生成強弱選手列表
+        if (strongPlayers.length > 0) {
+          const strongList = document.createElement('div');
+          strongList.innerHTML = `<h3>強選手:</h3>`;
+          strongList.innerHTML += `<div style="display: flex; flex-wrap: wrap; gap: 10px;">
+            ${strongPlayers.map(p => `<div class="player-card strong">${p}</div>`).join('')}
+          </div>`;
+          strengthAnalysis.appendChild(strongList);
+        }
+        
+        if (weakPlayers.length > 0) {
+          const weakList = document.createElement('div');
+          weakList.innerHTML = `<h3>弱選手:</h3>`;
+          weakList.innerHTML += `<div style="display: flex; flex-wrap: wrap; gap: 10px;">
+            ${weakPlayers.map(p => `<div class="player-card weak">${p}</div>`).join('')}
+          </div>`;
+          strengthAnalysis.appendChild(weakList);
+        }
+        
+        analysisResult.appendChild(strengthAnalysis);
+      } else if (analysisMode === 'history') {
+        // 歷史配對分析
+        if (history.length === 0) {
+          analysisResult.innerHTML = '<p>沒有歷史配對記錄</p>';
+          return;
+        }
+        
+        const partnerFrequency = {};
+        let totalPairings = 0;
+        
+        // 計算每對選手一起配對的次數
+        history.forEach(record => {
+          const group = record.group || [];
+          for (let i = 0; i < group.length; i += 2) {
+            if (i + 1 < group.length) {
+              const p1 = group[i];
+              const p2 = group[i + 1];
+              
+              if (!partnerFrequency[p1]) {
+                partnerFrequency[p1] = {};
+              }
+              if (!partnerFrequency[p2]) {
+                partnerFrequency[p2] = {};
+              }
+              
+              partnerFrequency[p1][p2] = (partnerFrequency[p1][p2] || 0) + 1;
+              partnerFrequency[p2][p1] = (partnerFrequency[p2][p1] || 0) + 1;
+              totalPairings++;
+            }
+          }
+        });
+        
+        // 找出配對最多的組合
+        const topPairings = [];
+        Object.keys(partnerFrequency).forEach(p1 => {
+          Object.keys(partnerFrequency[p1]).forEach(p2 => {
+            if (p1 < p2) { // 避免重複計算
+              topPairings.push({
+                pair: [p1, p2],
+                count: partnerFrequency[p1][p2]
+              });
+            }
+          });
+        });
+        
+        // 按配對次數排序
+        topPairings.sort((a, b) => b.count - a.count);
+        
+        // 顯示結果
+        const historyResult = document.createElement('div');
+        historyResult.innerHTML = `
+          <div class="info-box">
+            <h3>配對統計</h3>
+            <p>總配對次數：${totalPairings}</p>
+            <p>不同組合數：${topPairings.length}</p>
+          </div>
+        `;
+        
+        // 顯示前10個最常見配對
+        const topCount = Math.min(10, topPairings.length);
+        if (topCount > 0) {
+          const topList = document.createElement('div');
+          topList.innerHTML = `<h3>最常見配對</h3>`;
+          topList.innerHTML += `<ul>
+            ${topPairings.slice(0, topCount).map(item => 
+              `<li>${item.pair[0]} & ${item.pair[1]}: ${item.count} 次 (${(item.count * 100 / totalPairings).toFixed(1)}%)</li>`
+            ).join('')}
+          </ul>`;
+          historyResult.appendChild(topList);
+        }
+        
+        analysisResult.appendChild(historyResult);
+      }
+    }
+    
+    // 計算配對勝率矩陣
+    function calculatePairingMatrix(matches) {
+      // 初始化勝率矩陣
+      const pairingMatrix = {};
+      const pairingCounts = {};
+      
+      // 統計每對選手一起時的勝率
+      matches.forEach(match => {
+        const team1 = match.team1 || [];
+        const team2 = match.team2 || [];
+        const winner = match.winner;
+        
+        // 處理勝利隊伍
+        const winningTeam = winner === 1 ? team1 : team2;
+        processTeamPairings(winningTeam, true);
+        
+        // 處理失敗隊伍
+        const losingTeam = winner === 1 ? team2 : team1;
+        processTeamPairings(losingTeam, false);
+      });
+      
+      // 計算最終勝率
+      for (const player1 in pairingCounts) {
+        if (!pairingMatrix[player1]) {
+          pairingMatrix[player1] = {};
+        }
+        
+        for (const player2 in pairingCounts[player1]) {
+          const totalGames = pairingCounts[player1][player2];
+          const wins = pairingMatrix[player1][player2] || 0;
+          pairingMatrix[player1][player2] = totalGames > 0 ? wins / totalGames : 0;
+        }
+      }
+      
+      return pairingMatrix;
+      
+      // 內部函數：處理隊內配對
+      function processTeamPairings(team, isWin) {
+        for (let i = 0; i < team.length; i++) {
+          for (let j = 0; j < team.length; j++) {
+            if (i !== j) {
+              const player1 = team[i];
+              const player2 = team[j];
+              
+              // 初始化數據結構
+              if (!pairingMatrix[player1]) {
+                pairingMatrix[player1] = {};
+              }
+              if (!pairingCounts[player1]) {
+                pairingCounts[player1] = {};
+              }
+              
+              // 更新配對次數
+              pairingCounts[player1][player2] = (pairingCounts[player1][player2] || 0) + 1;
+              
+              // 更新勝場數
+              if (isWin) {
+                pairingMatrix[player1][player2] = (pairingMatrix[player1][player2] || 0) + 1;
+              }
+            }
+          }
+        }
+      }
     }
 
     renderList();
