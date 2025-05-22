@@ -506,6 +506,17 @@
       list-style-type: decimal;
     }
     
+    .info-box li li {
+      list-style-type: disc;
+      margin-left: 20px;
+      padding: 3px 0;
+    }
+    
+    .info-box ul {
+      margin-top: 5px;
+      margin-bottom: 5px;
+    }
+    
     .info-box li:hover {
       background: none;
       transform: none;
@@ -587,8 +598,15 @@
         <h3>如何使用強弱配對：</h3>
         <ol>
           <li>在「選手管理」中<strong>雙擊</strong>選手可標記為強(S)或弱(W)</li>
-          <li>選擇需要配對的選手</li>
-          <li>點擊「開始配對」，系統將從強弱選手中各抽取一名組成隊伍</li>
+          <li>選擇需要配對的選手，包含強弱選手</li>
+          <li>選擇適合的平衡模式：
+            <ul>
+              <li><strong>嚴格平衡</strong>：考慮出場次數和歷史配對記錄，最優配對</li>
+              <li><strong>一般平衡</strong>：優先考慮出場次數較少的選手配對</li>
+              <li><strong>完全隨機</strong>：完全隨機選擇配對</li>
+            </ul>
+          </li>
+          <li>點擊「開始配對」，系統將從強弱選手中配對一組組隊伍</li>
         </ol>
       </div>
       
@@ -600,10 +618,13 @@
         <div class="option-card">
           <label for="pairingMode">配對模式</label>
           <select id="pairingMode">
-            <option value="strict">嚴格匹配</option>
-            <option value="normal" selected>一般匹配</option>
-            <option value="random">隨機匹配</option>
+            <option value="strict">嚴格平衡</option>
+            <option value="normal" selected>一般平衡</option>
+            <option value="random">完全隨機</option>
           </select>
+        </div>
+        <div class="option-card">
+          <button onclick="clearPlayCount()" class="danger-button" style="margin-top: 0">🔄 重置出場次數</button>
         </div>
       </div>
       
@@ -1148,52 +1169,215 @@
       const weakPlayers = selectedPlayers.filter(p => playerStrength[p] === 'weak');
       const normalPlayers = selectedPlayers.filter(p => !playerStrength[p] || playerStrength[p] === 'normal');
 
-      if (pairingMode === 'strict' && (strongPlayers.length < pairsCount || weakPlayers.length < pairsCount)) {
-        alert(`嚴格匹配模式需要至少 ${pairsCount} 名強選手和 ${pairsCount} 名弱選手`);
+      if (strongPlayers.length === 0 || weakPlayers.length === 0) {
+        alert('配對功能需要至少標記一些選手為強(S)和弱(W)');
         return;
       }
 
       // 進行配對
       let pairingResult = [];
 
-      if (pairingMode === 'strict' || pairingMode === 'normal') {
-        // 準備強弱選手池
-        let strongPool = [...strongPlayers];
-        let weakPool = [...weakPlayers];
+      if (pairingMode === 'strict') {
+        // 嚴格匹配模式 - 考慮歷史配對次數和場次平衡
         
-        // 如果在一般匹配模式下選手不夠，使用未標記選手補充
-        if (pairingMode === 'normal') {
-          if (strongPool.length < pairsCount) {
-            const needed = pairsCount - strongPool.length;
-            const additional = normalPlayers.slice(0, needed);
-            strongPool = strongPool.concat(additional);
+        // 計算每個選手和其他選手一起打球的次數
+        const teamHistory = {};
+        selectedPlayers.forEach(p1 => {
+          teamHistory[p1] = {};
+          selectedPlayers.forEach(p2 => {
+            if (p1 !== p2) {
+              teamHistory[p1][p2] = 0;
+            }
+          });
+        });
+
+        // 從歷史記錄中統計搭配次數
+        history.forEach(record => {
+          // 僅計算參與過的選手
+          const participants = record.group || [];
+          for (let i = 0; i < participants.length; i += 2) {
+            if (i+1 < participants.length) {
+              const p1 = participants[i];
+              const p2 = participants[i+1];
+              if (teamHistory[p1] && teamHistory[p1][p2]) {
+                teamHistory[p1][p2]++;
+                teamHistory[p2][p1]++;
+              }
+            }
+          }
+        });
+        
+        // 根據出場次數排序強弱選手
+        const sortedStrongPlayers = [...strongPlayers].sort((a, b) => (count[a] || 0) - (count[b] || 0));
+        const sortedWeakPlayers = [...weakPlayers].sort((a, b) => (count[a] || 0) - (count[b] || 0));
+        
+        // 選擇場次最少的選手
+        const availableStrongPlayers = sortedStrongPlayers.slice(0, Math.min(pairsCount, sortedStrongPlayers.length));
+        const availableWeakPlayers = sortedWeakPlayers.slice(0, Math.min(pairsCount, sortedWeakPlayers.length));
+        
+        // 尋找最佳的配對方式
+        for (let i = 0; i < Math.min(availableStrongPlayers.length, availableWeakPlayers.length); i++) {
+          let bestPair = null;
+          let lowestScore = Infinity;
+          
+          for (let s = 0; s < availableStrongPlayers.length; s++) {
+            const strongPlayer = availableStrongPlayers[s];
+            if (!strongPlayer) continue; // 已配對的選手
+            
+            for (let w = 0; w < availableWeakPlayers.length; w++) {
+              const weakPlayer = availableWeakPlayers[w];
+              if (!weakPlayer) continue; // 已配對的選手
+              
+              // 計算這個配對的分數（越低越好）
+              let score = 0;
+              
+              // 考慮歷史配對次數
+              score += (teamHistory[strongPlayer][weakPlayer] || 0) * 5;
+              
+              // 考慮場次差異
+              const strongPlayerCount = count[strongPlayer] || 0;
+              const weakPlayerCount = count[weakPlayer] || 0;
+              score += Math.abs(strongPlayerCount - weakPlayerCount) * 10;
+              
+              // 如果找到更好的組合，就更新
+              if (score < lowestScore) {
+                lowestScore = score;
+                bestPair = [strongPlayer, weakPlayer, s, w];
+              }
+            }
           }
           
-          if (weakPool.length < pairsCount) {
-            const needed = pairsCount - weakPool.length;
-            const additional = normalPlayers.slice(0, needed);
-            weakPool = weakPool.concat(additional);
+          if (bestPair) {
+            pairingResult.push([bestPair[0], bestPair[1]]);
+            // 標記已配對的選手
+            availableStrongPlayers[bestPair[2]] = null;
+            availableWeakPlayers[bestPair[3]] = null;
           }
         }
         
-        // 開始配對
-        for (let i = 0; i < Math.min(pairsCount, Math.min(strongPool.length, weakPool.length)); i++) {
-          // 從強選手池中隨機選擇
-          const strongIndex = Math.floor(Math.random() * strongPool.length);
-          const strongPlayer = strongPool[strongIndex];
-          strongPool.splice(strongIndex, 1);
+      } else if (pairingMode === 'normal') {
+        // 一般匹配模式
+        // 按照出場次數從少到多排序
+        const strongPlayersByCount = {};
+        strongPlayers.forEach(player => {
+          const playCount = count[player] || 0;
+          if (!strongPlayersByCount[playCount]) {
+            strongPlayersByCount[playCount] = [];
+          }
+          strongPlayersByCount[playCount].push(player);
+        });
+        
+        const weakPlayersByCount = {};
+        weakPlayers.forEach(player => {
+          const playCount = count[player] || 0;
+          if (!weakPlayersByCount[playCount]) {
+            weakPlayersByCount[playCount] = [];
+          }
+          weakPlayersByCount[playCount].push(player);
+        });
+        
+        // 按照出場次數從少到多選擇選手
+        const selectedStrongPlayers = [];
+        const strongCounts = Object.keys(strongPlayersByCount).map(Number).sort((a, b) => a - b);
+        
+        while (selectedStrongPlayers.length < pairsCount && strongCounts.length > 0) {
+          const currentCount = strongCounts[0];
+          const availablePlayers = strongPlayersByCount[currentCount];
           
-          // 從弱選手池中隨機選擇
-          const weakIndex = Math.floor(Math.random() * weakPool.length);
-          const weakPlayer = weakPool[weakIndex];
-          weakPool.splice(weakIndex, 1);
+          while (selectedStrongPlayers.length < pairsCount && availablePlayers.length > 0) {
+            const randomIndex = Math.floor(Math.random() * availablePlayers.length);
+            selectedStrongPlayers.push(availablePlayers.splice(randomIndex, 1)[0]);
+          }
           
-          pairingResult.push([strongPlayer, weakPlayer]);
+          if (availablePlayers.length === 0) {
+            strongCounts.shift();
+          }
         }
+        
+        const selectedWeakPlayers = [];
+        const weakCounts = Object.keys(weakPlayersByCount).map(Number).sort((a, b) => a - b);
+        
+        while (selectedWeakPlayers.length < pairsCount && weakCounts.length > 0) {
+          const currentCount = weakCounts[0];
+          const availablePlayers = weakPlayersByCount[currentCount];
+          
+          while (selectedWeakPlayers.length < pairsCount && availablePlayers.length > 0) {
+            const randomIndex = Math.floor(Math.random() * availablePlayers.length);
+            selectedWeakPlayers.push(availablePlayers.splice(randomIndex, 1)[0]);
+          }
+          
+          if (availablePlayers.length === 0) {
+            weakCounts.shift();
+          }
+        }
+        
+        // 補充選手數量（如果需要）
+        if (selectedStrongPlayers.length < pairsCount && normalPlayers.length > 0) {
+          const normalPlayersByCount = {};
+          normalPlayers.forEach(player => {
+            const playCount = count[player] || 0;
+            if (!normalPlayersByCount[playCount]) {
+              normalPlayersByCount[playCount] = [];
+            }
+            normalPlayersByCount[playCount].push(player);
+          });
+          
+          const normalCounts = Object.keys(normalPlayersByCount).map(Number).sort((a, b) => a - b);
+          while (selectedStrongPlayers.length < pairsCount && normalCounts.length > 0) {
+            const currentCount = normalCounts[0];
+            const availablePlayers = normalPlayersByCount[currentCount];
+            
+            while (selectedStrongPlayers.length < pairsCount && availablePlayers.length > 0) {
+              const randomIndex = Math.floor(Math.random() * availablePlayers.length);
+              selectedStrongPlayers.push(availablePlayers.splice(randomIndex, 1)[0]);
+            }
+            
+            if (availablePlayers.length === 0) {
+              normalCounts.shift();
+            }
+          }
+        }
+        
+        if (selectedWeakPlayers.length < pairsCount && normalPlayers.length > 0) {
+          const normalPlayersByCount = {};
+          normalPlayers.forEach(player => {
+            const playCount = count[player] || 0;
+            if (!normalPlayersByCount[playCount]) {
+              normalPlayersByCount[playCount] = [];
+            }
+            normalPlayersByCount[playCount].push(player);
+          });
+          
+          const normalCounts = Object.keys(normalPlayersByCount).map(Number).sort((a, b) => a - b);
+          while (selectedWeakPlayers.length < pairsCount && normalCounts.length > 0) {
+            const currentCount = normalCounts[0];
+            const availablePlayers = normalPlayersByCount[currentCount];
+            
+            while (selectedWeakPlayers.length < pairsCount && availablePlayers.length > 0) {
+              const randomIndex = Math.floor(Math.random() * availablePlayers.length);
+              const player = availablePlayers.splice(randomIndex, 1)[0];
+              if (!selectedStrongPlayers.includes(player)) { // 確保選手不重複
+                selectedWeakPlayers.push(player);
+              }
+            }
+            
+            if (availablePlayers.length === 0) {
+              normalCounts.shift();
+            }
+          }
+        }
+        
+        // 配對選手
+        for (let i = 0; i < Math.min(selectedStrongPlayers.length, selectedWeakPlayers.length); i++) {
+          pairingResult.push([selectedStrongPlayers[i], selectedWeakPlayers[i]]);
+        }
+        
       } else {
-        // 隨機匹配模式
+        // 完全隨機模式
         let availablePlayers = [...selectedPlayers];
-        for (let i = 0; i < Math.min(pairsCount, Math.floor(availablePlayers.length / 2)); i++) {
+        for (let i = 0; i < pairsCount; i++) {
+          if (availablePlayers.length < 2) break;
+          
           // 隨機選擇第一位選手
           const index1 = Math.floor(Math.random() * availablePlayers.length);
           const player1 = availablePlayers[index1];
@@ -1243,6 +1427,18 @@
         `;
         result.appendChild(li);
       });
+      
+      // 添加未被選中的強弱選手
+      const usedPlayers = pairingResult.flat();
+      const unselectedPlayers = selectedPlayers.filter(p => !usedPlayers.includes(p));
+      
+      if (unselectedPlayers.length > 0) {
+        const waitingLi = document.createElement('li');
+        waitingLi.style.marginTop = '10px';
+        waitingLi.style.color = '#888';
+        waitingLi.innerHTML = `候補選手：${unselectedPlayers.join('、')}`;
+        result.appendChild(waitingLi);
+      }
       
       // 添加配對結果到歷史記錄
       const flatPairs = pairingResult.flat();
