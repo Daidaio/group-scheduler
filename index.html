@@ -243,7 +243,7 @@
 
     .tabs {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(4, 1fr);
       gap: 5px;
       margin-bottom: 20px;
     }
@@ -258,6 +258,14 @@
       transition: all 0.3s ease;
       font-size: 14px;
       text-align: center;
+    }
+
+    @media (max-width: 480px) {
+      .tabs {
+        grid-template-columns: repeat(2, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+        gap: 10px;
+      }
     }
 
     .tab.active {
@@ -392,6 +400,122 @@
     .team-members {
       text-align: center;
     }
+    
+    /* 強弱標記相關樣式 */
+    .strength-selector {
+      display: flex;
+      margin-top: 15px;
+      margin-bottom: 15px;
+      background: #333;
+      border-radius: 8px;
+      padding: 10px;
+    }
+    
+    .strength-option {
+      padding: 8px 15px;
+      background: #444;
+      color: #fff;
+      border-radius: 4px;
+      margin-right: 10px;
+      cursor: pointer;
+      font-size: 0.9em;
+      transition: all 0.3s ease;
+    }
+    
+    .strength-option:hover {
+      background: #555;
+    }
+    
+    .strength-option.selected {
+      background: #4fc3f7;
+      color: #000;
+    }
+    
+    .strength-badge {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      color: #000;
+      font-size: 12px;
+      font-weight: bold;
+      text-align: center;
+      line-height: 20px;
+      margin-left: auto;
+    }
+    
+    .strength-badge.strong {
+      background-color: #ff9955;
+    }
+    
+    .strength-badge.weak {
+      background-color: #55ff88;
+    }
+    
+    .team-pair {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 10px 0;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    
+    .player-card {
+      background: #333;
+      padding: 8px 12px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .player-card.strong {
+      border-left: 3px solid #ff9955;
+    }
+    
+    .player-card.weak {
+      border-left: 3px solid #55ff88;
+    }
+    
+    .info-box {
+      background: #333;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 15px 0;
+      border-left: 4px solid #4fc3f7;
+    }
+    
+    .info-box h3 {
+      margin-top: 0;
+      color: #4fc3f7;
+      font-size: 1.1em;
+      margin-bottom: 10px;
+    }
+    
+    .info-box ol, .info-box ul {
+      margin: 10px 0 5px 20px;
+      padding-left: 0;
+    }
+    
+    .info-box li {
+      background: none;
+      padding: 5px 0;
+      margin: 0;
+      display: list-item;
+      list-style-type: decimal;
+    }
+    
+    .info-box li:hover {
+      background: none;
+      transform: none;
+    }
+    
+    .tip-icon {
+      font-size: 1.2em;
+      margin-right: 5px;
+      color: #ffeb3b;
+    }
   </style>
 </head>
 <body>
@@ -401,6 +525,7 @@
     <div class="tabs">
       <button class="tab active" onclick="showTab('players')">👥 選手管理</button>
       <button class="tab" onclick="showTab('grouping')">🎲 分組</button>
+      <button class="tab" onclick="showTab('pairing')">🔄 強弱配對</button>
       <button class="tab" onclick="showTab('stats')">📊 統計</button>
     </div>
 
@@ -415,6 +540,9 @@
         <button class="quick-action-btn" onclick="selectAll(false)">取消全選</button>
         <button class="quick-action-btn" onclick="selectByPlayCount('least')">選擇場次最少</button>
         <button class="quick-action-btn" onclick="selectByPlayCount('most')">選擇場次最多</button>
+      </div>
+      <div class="info-box">
+        <p><span class="tip-icon">💡</span> <strong>提示：</strong>雙擊選手可以標記為強(S)或弱(W)，用於強弱配對功能</p>
       </div>
       <div class="select-all-container">
         <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
@@ -452,6 +580,44 @@
       <div id="groupResult"></div>
     </div>
 
+    <div id="pairing-tab" class="tab-content">
+      <h2>🔄 強弱配對</h2>
+      
+      <div class="info-box">
+        <h3>如何使用強弱配對：</h3>
+        <ol>
+          <li>在「選手管理」中<strong>雙擊</strong>選手可標記為強(S)或弱(W)</li>
+          <li>選擇需要配對的選手</li>
+          <li>點擊「開始配對」，系統將從強弱選手中各抽取一名組成隊伍</li>
+        </ol>
+      </div>
+      
+      <div class="options-grid">
+        <div class="option-card">
+          <label for="pairsCount">配對數量</label>
+          <input type="number" id="pairsCount" value="2" min="1" max="10">
+        </div>
+        <div class="option-card">
+          <label for="pairingMode">配對模式</label>
+          <select id="pairingMode">
+            <option value="strict">嚴格匹配</option>
+            <option value="normal" selected>一般匹配</option>
+            <option value="random">隨機匹配</option>
+          </select>
+        </div>
+      </div>
+      
+      <h3>快速標記</h3>
+      <div class="strength-selector">
+        <div class="strength-option" onclick="markSelectedPlayers('strong')">標記為強</div>
+        <div class="strength-option" onclick="markSelectedPlayers('weak')">標記為弱</div>
+        <div class="strength-option" onclick="markSelectedPlayers('normal')">取消標記</div>
+      </div>
+      
+      <button onclick="generatePairing()">開始配對</button>
+      <div id="pairingResult"></div>
+    </div>
+
     <div id="stats-tab" class="tab-content">
       <h2>📊 統計資訊</h2>
       <div class="stats-container">
@@ -483,11 +649,13 @@
     let players = JSON.parse(localStorage.getItem('players')) || [];
     let count = JSON.parse(localStorage.getItem('count')) || {};
     let history = JSON.parse(localStorage.getItem('history')) || [];
+    let playerStrength = JSON.parse(localStorage.getItem('playerStrength')) || {};
 
     function saveData() {
       localStorage.setItem('players', JSON.stringify(players));
       localStorage.setItem('count', JSON.stringify(count));
       localStorage.setItem('history', JSON.stringify(history));
+      localStorage.setItem('playerStrength', JSON.stringify(playerStrength));
     }
 
     function toggleSelectAll() {
@@ -868,9 +1036,36 @@
         playCount.style.fontSize = '0.8em';
         playCount.style.color = '#888';
         
+        // 添加強弱標記
+        const strengthBadge = document.createElement('span');
+        strengthBadge.className = 'strength-badge';
+        if (playerStrength[p] === 'strong') {
+          strengthBadge.textContent = 'S';
+          strengthBadge.classList.add('strong');
+        } else if (playerStrength[p] === 'weak') {
+          strengthBadge.textContent = 'W';
+          strengthBadge.classList.add('weak');
+        } else {
+          strengthBadge.style.display = 'none';
+        }
+        
+        // 為每個選手添加點擊事件，可以切換強弱標記
+        li.ondblclick = function() {
+          if (!playerStrength[p] || playerStrength[p] === 'normal') {
+            playerStrength[p] = 'strong';
+          } else if (playerStrength[p] === 'strong') {
+            playerStrength[p] = 'weak';
+          } else {
+            playerStrength[p] = 'normal';
+          }
+          saveData();
+          renderList(selectedPlayers);
+        };
+        
         li.appendChild(checkbox);
         li.appendChild(label);
         li.appendChild(playCount);
+        li.appendChild(strengthBadge);
         list.appendChild(li);
       });
 
@@ -935,6 +1130,141 @@
       document.getElementById('newPlayers').value = '';
       
       alert(`✅ 已新增 ${newPlayers.length} 名選手`);
+    }
+
+    function generatePairing() {
+      const checkboxes = document.querySelectorAll('#playerList input[type="checkbox"]:checked');
+      const selectedPlayers = Array.from(checkboxes).map(cb => cb.value);
+      const pairsCount = parseInt(document.getElementById('pairsCount').value) || 2;
+      const pairingMode = document.getElementById('pairingMode').value;
+      
+      if (selectedPlayers.length < 2) {
+        alert('至少需要勾選2名選手才可以進行配對');
+        return;
+      }
+
+      // 分類選手
+      const strongPlayers = selectedPlayers.filter(p => playerStrength[p] === 'strong');
+      const weakPlayers = selectedPlayers.filter(p => playerStrength[p] === 'weak');
+      const normalPlayers = selectedPlayers.filter(p => !playerStrength[p] || playerStrength[p] === 'normal');
+
+      if (pairingMode === 'strict' && (strongPlayers.length < pairsCount || weakPlayers.length < pairsCount)) {
+        alert(`嚴格匹配模式需要至少 ${pairsCount} 名強選手和 ${pairsCount} 名弱選手`);
+        return;
+      }
+
+      // 進行配對
+      let pairingResult = [];
+
+      if (pairingMode === 'strict' || pairingMode === 'normal') {
+        // 準備強弱選手池
+        let strongPool = [...strongPlayers];
+        let weakPool = [...weakPlayers];
+        
+        // 如果在一般匹配模式下選手不夠，使用未標記選手補充
+        if (pairingMode === 'normal') {
+          if (strongPool.length < pairsCount) {
+            const needed = pairsCount - strongPool.length;
+            const additional = normalPlayers.slice(0, needed);
+            strongPool = strongPool.concat(additional);
+          }
+          
+          if (weakPool.length < pairsCount) {
+            const needed = pairsCount - weakPool.length;
+            const additional = normalPlayers.slice(0, needed);
+            weakPool = weakPool.concat(additional);
+          }
+        }
+        
+        // 開始配對
+        for (let i = 0; i < Math.min(pairsCount, Math.min(strongPool.length, weakPool.length)); i++) {
+          // 從強選手池中隨機選擇
+          const strongIndex = Math.floor(Math.random() * strongPool.length);
+          const strongPlayer = strongPool[strongIndex];
+          strongPool.splice(strongIndex, 1);
+          
+          // 從弱選手池中隨機選擇
+          const weakIndex = Math.floor(Math.random() * weakPool.length);
+          const weakPlayer = weakPool[weakIndex];
+          weakPool.splice(weakIndex, 1);
+          
+          pairingResult.push([strongPlayer, weakPlayer]);
+        }
+      } else {
+        // 隨機匹配模式
+        let availablePlayers = [...selectedPlayers];
+        for (let i = 0; i < Math.min(pairsCount, Math.floor(availablePlayers.length / 2)); i++) {
+          // 隨機選擇第一位選手
+          const index1 = Math.floor(Math.random() * availablePlayers.length);
+          const player1 = availablePlayers[index1];
+          availablePlayers.splice(index1, 1);
+          
+          // 隨機選擇第二位選手
+          const index2 = Math.floor(Math.random() * availablePlayers.length);
+          const player2 = availablePlayers[index2];
+          availablePlayers.splice(index2, 1);
+          
+          pairingResult.push([player1, player2]);
+        }
+      }
+
+      // 顯示結果
+      const result = document.getElementById('pairingResult');
+      result.innerHTML = '';
+      
+      if (pairingResult.length === 0) {
+        const li = document.createElement('li');
+        li.innerHTML = '無法進行配對，請確保有足夠的強弱選手。';
+        result.appendChild(li);
+        return;
+      }
+      
+      // 創建配對結果顯示
+      pairingResult.forEach((pair, index) => {
+        const li = document.createElement('li');
+        li.className = 'team-pair';
+        
+        // 檢查選手是否有強弱標記
+        const player1Strength = playerStrength[pair[0]] === 'strong' ? 'strong' : 
+                                playerStrength[pair[0]] === 'weak' ? 'weak' : '';
+        const player2Strength = playerStrength[pair[1]] === 'strong' ? 'strong' : 
+                                playerStrength[pair[1]] === 'weak' ? 'weak' : '';
+        
+        li.innerHTML = `
+          <div class="player-card ${player1Strength}">
+            ${pair[0]}
+            ${player1Strength ? `<span class="strength-badge ${player1Strength}">${player1Strength === 'strong' ? 'S' : 'W'}</span>` : ''}
+          </div>
+          <div class="vs-text">&</div>
+          <div class="player-card ${player2Strength}">
+            ${pair[1]}
+            ${player2Strength ? `<span class="strength-badge ${player2Strength}">${player2Strength === 'strong' ? 'S' : 'W'}</span>` : ''}
+          </div>
+        `;
+        result.appendChild(li);
+      });
+      
+      // 添加配對結果到歷史記錄
+      const flatPairs = pairingResult.flat();
+      
+      // 更新出場次數
+      flatPairs.forEach(name => {
+        count[name] = (count[name] || 0) + 1;
+      });
+      
+      saveData();
+      renderList();
+      updateStats();
+    }
+
+    function markSelectedPlayers(strength) {
+      const checkboxes = document.querySelectorAll('#playerList input[type="checkbox"]:checked');
+      const selectedPlayers = Array.from(checkboxes).map(cb => cb.value);
+      selectedPlayers.forEach(p => {
+        playerStrength[p] = strength;
+      });
+      saveData();
+      renderList();
     }
 
     renderList();
