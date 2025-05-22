@@ -820,6 +820,16 @@
         </ul>
         <p>要使用機器學習分析，需要在分組後記錄比賽結果</p>
       </div>
+      <div id="mlAlgorithmInfo" style="display: none;" class="info-box">
+        <h3>機器學習演算法說明：</h3>
+        <p>機器學習模式會遵循以下步驟進行分組和配對：</p>
+        <ol>
+          <li><strong>初步選擇選手</strong>：優先選擇出場次數較少的選手（遵循一般平衡模式）</li>
+          <li><strong>計算能力值</strong>：根據勝率、強弱標記和近期表現計算每位選手的能力值</li>
+          <li><strong>最佳組合</strong>：在保證出場平衡的基礎上，進一步考慮選手的勝率、配合度和互補性，形成最平衡的組合</li>
+        </ol>
+        <p>機器學習會隨著比賽記錄的增加逐漸提高預測能力，能更準確地預測最佳的配對組合。</p>
+      </div>
       <div id="analysisResult"></div>
     </div>
 
@@ -1190,10 +1200,39 @@
         }
       } else if (balanceMode === 'ml') {
         // 機器學習模式：基於歷史數據和玩家表現預測最佳組合
-        // 1. 計算每位選手的能力值
+        
+        // 步驟1: 先按照一般平衡模式選擇選手（考慮出場次數）
+        const playersByCount = {};
+        selectedPlayers.forEach(player => {
+          const playCount = count[player] || 0;
+          if (!playersByCount[playCount]) {
+            playersByCount[playCount] = [];
+          }
+          playersByCount[playCount].push(player);
+        });
+
+        // 按照出場次數從少到多選擇選手
+        selectedForGame = [];
+        const counts = Object.keys(playersByCount).map(Number).sort((a, b) => a - b);
+        
+        while (selectedForGame.length < groupSize && counts.length > 0) {
+          const currentCount = counts[0];
+          const availablePlayers = playersByCount[currentCount];
+          
+          while (selectedForGame.length < groupSize && availablePlayers.length > 0) {
+            const randomIndex = Math.floor(Math.random() * availablePlayers.length);
+            selectedForGame.push(availablePlayers.splice(randomIndex, 1)[0]);
+          }
+          
+          if (availablePlayers.length === 0) {
+            counts.shift();
+          }
+        }
+        
+        // 步驟2: 計算每位選手的能力值（基於勝率、強弱標記和近期表現）
         const playerRatings = {};
         
-        selectedPlayers.forEach(player => {
+        selectedForGame.forEach(player => {
           // 基礎能力值，預設為場次加權平均
           const stats = playerStats[player] || { wins: 0, matches: 0, partners: {}, opponents: {} };
           const winRate = stats.matches > 0 ? stats.wins / stats.matches : 0.5;
@@ -1213,22 +1252,21 @@
           playerRatings[player] = baseRating + recentPerformance;
         });
         
-        // 2. 分隊方法：確保團隊總能力值盡可能接近
+        // 步驟3: 根據能力值將選手分為實力較均衡的兩隊
         const halfSize = Math.floor(groupSize / 2);
         let bestTeams = null;
         let lowestDifference = Infinity;
         
-        // 嘗試更多次分組，找出最平衡的組合
-        for (let attempt = 0; attempt < 200; attempt++) {
-          const shuffled = [...selectedPlayers];
+        // 嘗試多次分組，找出最平衡的組合
+        for (let attempt = 0; attempt < 100; attempt++) {
+          const shuffled = [...selectedForGame];
           for (let i = shuffled.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
           }
           
-          const candidateGroup = shuffled.slice(0, groupSize);
-          const team1 = candidateGroup.slice(0, halfSize);
-          const team2 = candidateGroup.slice(halfSize);
+          const team1 = shuffled.slice(0, halfSize);
+          const team2 = shuffled.slice(halfSize);
           
           // 計算兩隊的總能力值
           const team1Rating = team1.reduce((sum, player) => sum + playerRatings[player], 0);
@@ -1237,7 +1275,7 @@
           // 計算能力值差異
           const difference = Math.abs(team1Rating - team2Rating);
           
-          // 考慮搭檔兼容性
+          // 考慮隊友兼容性
           let compatibilityScore = 0;
           
           team1.forEach((p1, i) => {
@@ -1260,8 +1298,8 @@
             });
           });
           
-          // 綜合考慮能力值差異和兼容性
-          const finalScore = difference - compatibilityScore * 5;
+          // 最終分數 = 能力值差異 - 兼容性分數
+          const finalScore = difference - compatibilityScore * 3;
           
           if (finalScore < lowestDifference) {
             lowestDifference = finalScore;
@@ -1679,11 +1717,68 @@
       } else if (pairingMode === 'ml') {
         // 機器學習模式 - 考慮選手之間的配合歷史和實力差距
         
-        // 1. 計算所有強弱選手的能力值
+        // 步驟1: 先按照一般平衡模式選擇強弱選手（優先考慮出場次數少的）
+        // 強選手按出場次數排序
+        const strongPlayersByCount = {};
+        strongPlayers.forEach(player => {
+          const playCount = count[player] || 0;
+          if (!strongPlayersByCount[playCount]) {
+            strongPlayersByCount[playCount] = [];
+          }
+          strongPlayersByCount[playCount].push(player);
+        });
+        
+        // 弱選手按出場次數排序
+        const weakPlayersByCount = {};
+        weakPlayers.forEach(player => {
+          const playCount = count[player] || 0;
+          if (!weakPlayersByCount[playCount]) {
+            weakPlayersByCount[playCount] = [];
+          }
+          weakPlayersByCount[playCount].push(player);
+        });
+        
+        // 按出場次數從少到多選擇強選手
+        const selectedStrongPlayers = [];
+        const strongCounts = Object.keys(strongPlayersByCount).map(Number).sort((a, b) => a - b);
+        
+        while (selectedStrongPlayers.length < pairsCount && strongCounts.length > 0) {
+          const currentCount = strongCounts[0];
+          const availablePlayers = strongPlayersByCount[currentCount];
+          
+          while (selectedStrongPlayers.length < pairsCount && availablePlayers.length > 0) {
+            const randomIndex = Math.floor(Math.random() * availablePlayers.length);
+            selectedStrongPlayers.push(availablePlayers.splice(randomIndex, 1)[0]);
+          }
+          
+          if (availablePlayers.length === 0) {
+            strongCounts.shift();
+          }
+        }
+        
+        // 按出場次數從少到多選擇弱選手
+        const selectedWeakPlayers = [];
+        const weakCounts = Object.keys(weakPlayersByCount).map(Number).sort((a, b) => a - b);
+        
+        while (selectedWeakPlayers.length < pairsCount && weakCounts.length > 0) {
+          const currentCount = weakCounts[0];
+          const availablePlayers = weakPlayersByCount[currentCount];
+          
+          while (selectedWeakPlayers.length < pairsCount && availablePlayers.length > 0) {
+            const randomIndex = Math.floor(Math.random() * availablePlayers.length);
+            selectedWeakPlayers.push(availablePlayers.splice(randomIndex, 1)[0]);
+          }
+          
+          if (availablePlayers.length === 0) {
+            weakCounts.shift();
+          }
+        }
+        
+        // 步驟2: 計算每位選手的能力值
         const strongRatings = {};
         const weakRatings = {};
         
-        strongPlayers.forEach(player => {
+        selectedStrongPlayers.forEach(player => {
           // 基礎能力值計算
           const stats = playerStats[player] || { wins: 0, matches: 0, partners: {}, opponents: {} };
           const winRate = stats.matches > 0 ? stats.wins / stats.matches : 0.5;
@@ -1695,7 +1790,7 @@
           strongRatings[player] = baseRating + recentPerformance;
         });
         
-        weakPlayers.forEach(player => {
+        selectedWeakPlayers.forEach(player => {
           const stats = playerStats[player] || { wins: 0, matches: 0, partners: {}, opponents: {} };
           const winRate = stats.matches > 0 ? stats.wins / stats.matches : 0.5;
           
@@ -1705,31 +1800,32 @@
           weakRatings[player] = baseRating + recentPerformance;
         });
         
-        // 2. 考慮互補性和配合度，尋找最佳配對
-        const availableStrong = [...strongPlayers];
-        const availableWeak = [...weakPlayers];
-        
-        for (let i = 0; i < pairsCount; i++) {
-          if (availableStrong.length === 0 || availableWeak.length === 0) break;
-          
+        // 步驟3: 進行最優配對
+        for (let i = 0; i < Math.min(selectedStrongPlayers.length, selectedWeakPlayers.length); i++) {
           let bestPair = null;
           let bestScore = -Infinity;
           
           // 檢查所有可能的配對組合
-          for (let s = 0; s < availableStrong.length; s++) {
-            const strongPlayer = availableStrong[s];
+          for (let s = 0; s < selectedStrongPlayers.length; s++) {
+            const strongPlayer = selectedStrongPlayers[s];
+            if (!strongPlayer) continue; // 已配對的選手
             
-            for (let w = 0; w < availableWeak.length; w++) {
-              const weakPlayer = availableWeak[w];
+            for (let w = 0; w < selectedWeakPlayers.length; w++) {
+              const weakPlayer = selectedWeakPlayers[w];
+              if (!weakPlayer) continue; // 已配對的選手
               
               // 計算配對分數
               let pairScore = 0;
               
-              // 1. 能力值差距（越小越好）
-              const ratingDifference = Math.abs(strongRatings[strongPlayer] - weakRatings[weakPlayer]);
-              pairScore -= ratingDifference * 0.01; // 減少差距的影響
+              // 1. 優先考慮出場次數相近的選手（一般平衡邏輯）
+              const countDifference = Math.abs((count[strongPlayer] || 0) - (count[weakPlayer] || 0));
+              pairScore -= countDifference * 5;
               
-              // 2. 配合度（越高越好）
+              // 2. 能力值差距（越小越好）
+              const ratingDifference = Math.abs(strongRatings[strongPlayer] - weakRatings[weakPlayer]);
+              pairScore -= ratingDifference * 0.005; // 減少差距的影響
+              
+              // 3. 配合度（越高越好）
               const strongStats = playerStats[strongPlayer] || { partners: {} };
               const weakStats = playerStats[weakPlayer] || { partners: {} };
               
@@ -1737,11 +1833,7 @@
                 (strongStats.partners[weakPlayer] || 0) + 
                 (weakStats.partners[strongPlayer] || 0);
               
-              pairScore += partnershipScore * 10;
-              
-              // 3. 出場次數差距（越小越好）
-              const countDifference = Math.abs((count[strongPlayer] || 0) - (count[weakPlayer] || 0));
-              pairScore -= countDifference * 5;
+              pairScore += partnershipScore * 15;
               
               if (pairScore > bestScore) {
                 bestScore = pairScore;
@@ -1753,25 +1845,25 @@
           if (bestPair) {
             pairingResult.push([bestPair[0], bestPair[1]]);
             // 從可用列表中移除
-            availableStrong.splice(bestPair[2], 1);
-            availableWeak.splice(bestPair[3], 1);
+            selectedStrongPlayers[bestPair[2]] = null;
+            selectedWeakPlayers[bestPair[3]] = null;
           }
         }
         
+        // 步驟4: 補充配對不足的情況
         // 如果配對不足，使用普通選手補充
         if (pairingResult.length < pairsCount && normalPlayers.length >= 2) {
           // 使用剩餘可用的強弱選手和普通選手混合搭配
+          const availableStrong = selectedStrongPlayers.filter(p => p !== null);
+          const availableWeak = selectedWeakPlayers.filter(p => p !== null);
           const remainingPlayers = [...availableStrong, ...availableWeak, ...normalPlayers];
           
+          // 優先根據出場次數少的選手
+          remainingPlayers.sort((a, b) => (count[a] || 0) - (count[b] || 0));
+          
           while (pairingResult.length < pairsCount && remainingPlayers.length >= 2) {
-            const index1 = Math.floor(Math.random() * remainingPlayers.length);
-            const player1 = remainingPlayers[index1];
-            remainingPlayers.splice(index1, 1);
-            
-            const index2 = Math.floor(Math.random() * remainingPlayers.length);
-            const player2 = remainingPlayers[index2];
-            remainingPlayers.splice(index2, 1);
-            
+            const player1 = remainingPlayers.shift();
+            const player2 = remainingPlayers.shift();
             pairingResult.push([player1, player2]);
           }
         }
@@ -2014,9 +2106,13 @@
       const analysisMode = document.getElementById('analysisMode').value;
       const analysisRange = document.getElementById('analysisRange').value;
       const analysisResult = document.getElementById('analysisResult');
+      const mlAlgorithmInfo = document.getElementById('mlAlgorithmInfo');
       
       // 清空結果區域
       analysisResult.innerHTML = '';
+      
+      // 根據選擇的分析模式顯示/隱藏機器學習演算法說明
+      mlAlgorithmInfo.style.display = analysisMode === 'ml' ? 'block' : 'none';
       
       // 檢查是否有足夠數據
       if (players.length === 0) {
