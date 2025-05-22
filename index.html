@@ -527,6 +527,50 @@
       margin-right: 5px;
       color: #ffeb3b;
     }
+
+    /* 比賽結果相關樣式 */
+    .match-result-btns {
+      display: flex;
+      gap: 15px;
+      margin: 15px 0;
+    }
+    
+    .result-btn {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .team1-win {
+      background: #55ff88;
+      color: #000;
+    }
+    
+    .team2-win {
+      background: #ff9955;
+      color: #000;
+    }
+    
+    .team1-win:hover {
+      background: #3afc77;
+    }
+    
+    .team2-win:hover {
+      background: #ff8840;
+    }
+    
+    .small-tip {
+      font-size: 0.8em;
+      color: #888;
+      margin-top: 5px;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
@@ -581,6 +625,7 @@
             <option value="strict">嚴格平衡</option>
             <option value="normal" selected>一般平衡</option>
             <option value="random">完全隨機</option>
+            <option value="ml">機器學習</option>
           </select>
         </div>
         <div class="option-card">
@@ -589,6 +634,14 @@
       </div>
       <button onclick="generateGroup()">開始分組</button>
       <div id="groupResult"></div>
+      <div id="matchResultContainer" style="display:none; margin-top: 20px;">
+        <h3>📊 記錄比賽結果</h3>
+        <div class="match-result-btns">
+          <button onclick="recordMatchResult(1)" class="result-btn team1-win">隊伍1獲勝</button>
+          <button onclick="recordMatchResult(2)" class="result-btn team2-win">隊伍2獲勝</button>
+        </div>
+        <p class="small-tip">記錄比賽結果有助於改進機器學習模式的預測</p>
+      </div>
     </div>
 
     <div id="pairing-tab" class="tab-content">
@@ -621,6 +674,7 @@
             <option value="strict">嚴格平衡</option>
             <option value="normal" selected>一般平衡</option>
             <option value="random">完全隨機</option>
+            <option value="ml">機器學習</option>
           </select>
         </div>
         <div class="option-card">
@@ -671,12 +725,19 @@
     let count = JSON.parse(localStorage.getItem('count')) || {};
     let history = JSON.parse(localStorage.getItem('history')) || [];
     let playerStrength = JSON.parse(localStorage.getItem('playerStrength')) || {};
+    // 機器學習模式相關數據
+    let matchResults = JSON.parse(localStorage.getItem('matchResults')) || [];
+    let playerStats = JSON.parse(localStorage.getItem('playerStats')) || {};
+    let lastPrediction = JSON.parse(localStorage.getItem('lastPrediction')) || {};
 
     function saveData() {
       localStorage.setItem('players', JSON.stringify(players));
       localStorage.setItem('count', JSON.stringify(count));
       localStorage.setItem('history', JSON.stringify(history));
       localStorage.setItem('playerStrength', JSON.stringify(playerStrength));
+      localStorage.setItem('matchResults', JSON.stringify(matchResults));
+      localStorage.setItem('playerStats', JSON.stringify(playerStats));
+      localStorage.setItem('lastPrediction', JSON.stringify(lastPrediction));
     }
 
     function toggleSelectAll() {
@@ -988,6 +1049,104 @@
           const j = Math.floor(Math.random() * (i + 1));
           [selectedForGame[i], selectedForGame[j]] = [selectedForGame[j], selectedForGame[i]];
         }
+      } else if (balanceMode === 'ml') {
+        // 機器學習模式：基於歷史數據和玩家表現預測最佳組合
+        // 1. 計算每位選手的能力值
+        const playerRatings = {};
+        
+        selectedPlayers.forEach(player => {
+          // 基礎能力值，預設為場次加權平均
+          const stats = playerStats[player] || { wins: 0, matches: 0, partners: {}, opponents: {} };
+          const winRate = stats.matches > 0 ? stats.wins / stats.matches : 0.5;
+          
+          // 結合強弱標記調整能力值
+          let baseRating = 1500 + winRate * 500;
+          if (playerStrength[player] === 'strong') {
+            baseRating += 200;
+          } else if (playerStrength[player] === 'weak') {
+            baseRating -= 100;
+          }
+          
+          // 考慮歷史表現
+          const recentPerformance = calculateRecentPerformance(player);
+          
+          // 最終能力值
+          playerRatings[player] = baseRating + recentPerformance;
+        });
+        
+        // 2. 分隊方法：確保團隊總能力值盡可能接近
+        const halfSize = Math.floor(groupSize / 2);
+        let bestTeams = null;
+        let lowestDifference = Infinity;
+        
+        // 嘗試更多次分組，找出最平衡的組合
+        for (let attempt = 0; attempt < 200; attempt++) {
+          const shuffled = [...selectedPlayers];
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          }
+          
+          const candidateGroup = shuffled.slice(0, groupSize);
+          const team1 = candidateGroup.slice(0, halfSize);
+          const team2 = candidateGroup.slice(halfSize);
+          
+          // 計算兩隊的總能力值
+          const team1Rating = team1.reduce((sum, player) => sum + playerRatings[player], 0);
+          const team2Rating = team2.reduce((sum, player) => sum + playerRatings[player], 0);
+          
+          // 計算能力值差異
+          const difference = Math.abs(team1Rating - team2Rating);
+          
+          // 考慮搭檔兼容性
+          let compatibilityScore = 0;
+          
+          team1.forEach((p1, i) => {
+            team1.forEach((p2, j) => {
+              if (i < j) {
+                const stats = playerStats[p1] || { partners: {} };
+                const partnerScore = stats.partners[p2] || 0;
+                compatibilityScore += partnerScore;
+              }
+            });
+          });
+          
+          team2.forEach((p1, i) => {
+            team2.forEach((p2, j) => {
+              if (i < j) {
+                const stats = playerStats[p1] || { partners: {} };
+                const partnerScore = stats.partners[p2] || 0;
+                compatibilityScore += partnerScore;
+              }
+            });
+          });
+          
+          // 綜合考慮能力值差異和兼容性
+          const finalScore = difference - compatibilityScore * 5;
+          
+          if (finalScore < lowestDifference) {
+            lowestDifference = finalScore;
+            bestTeams = [team1, team2];
+            
+            // 記錄預測，供未來評估使用
+            lastPrediction = {
+              timestamp: Date.now(),
+              team1: team1,
+              team2: team2,
+              team1Rating,
+              team2Rating,
+              difference
+            };
+          }
+        }
+        
+        if (bestTeams === null) {
+          alert('無法找到合適的分組，請重試');
+          return;
+        }
+        
+        selectedForGame = [...bestTeams[0], ...bestTeams[1]];
+        saveData();
       } else {
         // 完全隨機模式
         selectedForGame = selectedPlayers
@@ -1027,6 +1186,13 @@
         waitingLi.style.color = '#888';
         waitingLi.innerHTML = `候補選手：${unselectedPlayers.join('、')}`;
         result.appendChild(waitingLi);
+      }
+      
+      // 當使用機器學習模式時，顯示記錄比賽結果的控件
+      if (balanceMode === 'ml') {
+        document.getElementById('matchResultContainer').style.display = 'block';
+      } else {
+        document.getElementById('matchResultContainer').style.display = 'none';
       }
 
       addToHistory(selectedForGame);
@@ -1371,9 +1537,107 @@
         for (let i = 0; i < Math.min(selectedStrongPlayers.length, selectedWeakPlayers.length); i++) {
           pairingResult.push([selectedStrongPlayers[i], selectedWeakPlayers[i]]);
         }
+      } else if (pairingMode === 'ml') {
+        // 機器學習模式 - 考慮選手之間的配合歷史和實力差距
         
+        // 1. 計算所有強弱選手的能力值
+        const strongRatings = {};
+        const weakRatings = {};
+        
+        strongPlayers.forEach(player => {
+          // 基礎能力值計算
+          const stats = playerStats[player] || { wins: 0, matches: 0, partners: {}, opponents: {} };
+          const winRate = stats.matches > 0 ? stats.wins / stats.matches : 0.5;
+          
+          // 考慮強弱標記和歷史表現
+          const baseRating = 1500 + winRate * 500 + 200; // 強隊員基礎加分
+          const recentPerformance = calculateRecentPerformance(player);
+          
+          strongRatings[player] = baseRating + recentPerformance;
+        });
+        
+        weakPlayers.forEach(player => {
+          const stats = playerStats[player] || { wins: 0, matches: 0, partners: {}, opponents: {} };
+          const winRate = stats.matches > 0 ? stats.wins / stats.matches : 0.5;
+          
+          const baseRating = 1500 + winRate * 500 - 100; // 弱隊員基礎減分
+          const recentPerformance = calculateRecentPerformance(player);
+          
+          weakRatings[player] = baseRating + recentPerformance;
+        });
+        
+        // 2. 考慮互補性和配合度，尋找最佳配對
+        const availableStrong = [...strongPlayers];
+        const availableWeak = [...weakPlayers];
+        
+        for (let i = 0; i < pairsCount; i++) {
+          if (availableStrong.length === 0 || availableWeak.length === 0) break;
+          
+          let bestPair = null;
+          let bestScore = -Infinity;
+          
+          // 檢查所有可能的配對組合
+          for (let s = 0; s < availableStrong.length; s++) {
+            const strongPlayer = availableStrong[s];
+            
+            for (let w = 0; w < availableWeak.length; w++) {
+              const weakPlayer = availableWeak[w];
+              
+              // 計算配對分數
+              let pairScore = 0;
+              
+              // 1. 能力值差距（越小越好）
+              const ratingDifference = Math.abs(strongRatings[strongPlayer] - weakRatings[weakPlayer]);
+              pairScore -= ratingDifference * 0.01; // 減少差距的影響
+              
+              // 2. 配合度（越高越好）
+              const strongStats = playerStats[strongPlayer] || { partners: {} };
+              const weakStats = playerStats[weakPlayer] || { partners: {} };
+              
+              const partnershipScore = 
+                (strongStats.partners[weakPlayer] || 0) + 
+                (weakStats.partners[strongPlayer] || 0);
+              
+              pairScore += partnershipScore * 10;
+              
+              // 3. 出場次數差距（越小越好）
+              const countDifference = Math.abs((count[strongPlayer] || 0) - (count[weakPlayer] || 0));
+              pairScore -= countDifference * 5;
+              
+              if (pairScore > bestScore) {
+                bestScore = pairScore;
+                bestPair = [strongPlayer, weakPlayer, s, w];
+              }
+            }
+          }
+          
+          if (bestPair) {
+            pairingResult.push([bestPair[0], bestPair[1]]);
+            // 從可用列表中移除
+            availableStrong.splice(bestPair[2], 1);
+            availableWeak.splice(bestPair[3], 1);
+          }
+        }
+        
+        // 如果配對不足，使用普通選手補充
+        if (pairingResult.length < pairsCount && normalPlayers.length >= 2) {
+          // 使用剩餘可用的強弱選手和普通選手混合搭配
+          const remainingPlayers = [...availableStrong, ...availableWeak, ...normalPlayers];
+          
+          while (pairingResult.length < pairsCount && remainingPlayers.length >= 2) {
+            const index1 = Math.floor(Math.random() * remainingPlayers.length);
+            const player1 = remainingPlayers[index1];
+            remainingPlayers.splice(index1, 1);
+            
+            const index2 = Math.floor(Math.random() * remainingPlayers.length);
+            const player2 = remainingPlayers[index2];
+            remainingPlayers.splice(index2, 1);
+            
+            pairingResult.push([player1, player2]);
+          }
+        }
       } else {
-        // 完全隨機模式
+        // 隨機匹配模式
         let availablePlayers = [...selectedPlayers];
         for (let i = 0; i < pairsCount; i++) {
           if (availablePlayers.length < 2) break;
@@ -1461,6 +1725,150 @@
       });
       saveData();
       renderList(selectedPlayers);
+    }
+
+    // 計算玩家近期表現
+    function calculateRecentPerformance(player) {
+      if (!matchResults.length) return 0;
+      
+      // 只考慮最近10場比賽
+      const recentMatches = matchResults.filter(result => 
+        result.team1.includes(player) || result.team2.includes(player)
+      ).slice(0, 10);
+      
+      if (!recentMatches.length) return 0;
+      
+      let performanceScore = 0;
+      
+      recentMatches.forEach(match => {
+        // 判斷玩家在哪一隊
+        const isInTeam1 = match.team1.includes(player);
+        const team = isInTeam1 ? match.team1 : match.team2;
+        const isWinner = (isInTeam1 && match.winner === 1) || (!isInTeam1 && match.winner === 2);
+        
+        // 勝利加分，失敗減分
+        performanceScore += isWinner ? 50 : -25;
+        
+        // 考慮與隊友的配合
+        team.forEach(teammate => {
+          if (teammate !== player) {
+            // 更新玩家數據
+            if (!playerStats[player]) {
+              playerStats[player] = { wins: 0, matches: 0, partners: {}, opponents: {} };
+            }
+            
+            if (!playerStats[player].partners[teammate]) {
+              playerStats[player].partners[teammate] = 0;
+            }
+            
+            // 勝利者與隊友配合度提高
+            playerStats[player].partners[teammate] += isWinner ? 1 : -0.2;
+          }
+        });
+      });
+      
+      return performanceScore / recentMatches.length;
+    }
+
+    function recordMatchResult(winner) {
+      // 檢查是否有最近的分組
+      if (!lastPrediction || !lastPrediction.team1 || !lastPrediction.team2) {
+        alert('沒有最近的比賽記錄可用');
+        return;
+      }
+      
+      // 獲取最近的分組信息
+      const { team1, team2, timestamp } = lastPrediction;
+      
+      // 確保分組時間在24小時內
+      if (Date.now() - timestamp > 24 * 60 * 60 * 1000) {
+        if (!confirm('這個比賽記錄已超過24小時，是否仍要記錄結果？')) {
+          return;
+        }
+      }
+      
+      // 添加到比賽結果
+      const matchResult = {
+        timestamp: Date.now(),
+        team1: team1,
+        team2: team2,
+        winner: winner
+      };
+      
+      matchResults.unshift(matchResult);
+      
+      // 只保留最近100場比賽
+      if (matchResults.length > 100) {
+        matchResults.pop();
+      }
+      
+      // 更新玩家統計數據
+      const winningTeam = winner === 1 ? team1 : team2;
+      const losingTeam = winner === 1 ? team2 : team1;
+      
+      // 更新勝利隊員數據
+      winningTeam.forEach(player => {
+        if (!playerStats[player]) {
+          playerStats[player] = { wins: 0, matches: 0, partners: {}, opponents: {} };
+        }
+        
+        playerStats[player].wins += 1;
+        playerStats[player].matches += 1;
+        
+        // 更新與隊友的配合度
+        winningTeam.forEach(teammate => {
+          if (player !== teammate) {
+            if (!playerStats[player].partners[teammate]) {
+              playerStats[player].partners[teammate] = 0;
+            }
+            playerStats[player].partners[teammate] += 1;
+          }
+        });
+        
+        // 更新對手數據
+        losingTeam.forEach(opponent => {
+          if (!playerStats[player].opponents[opponent]) {
+            playerStats[player].opponents[opponent] = 0;
+          }
+          playerStats[player].opponents[opponent] += 1;
+        });
+      });
+      
+      // 更新失敗隊員數據
+      losingTeam.forEach(player => {
+        if (!playerStats[player]) {
+          playerStats[player] = { wins: 0, matches: 0, partners: {}, opponents: {} };
+        }
+        
+        playerStats[player].matches += 1;
+        
+        // 更新隊友數據（負面的）
+        losingTeam.forEach(teammate => {
+          if (player !== teammate) {
+            if (!playerStats[player].partners[teammate]) {
+              playerStats[player].partners[teammate] = 0;
+            }
+            playerStats[player].partners[teammate] -= 0.2;
+          }
+        });
+        
+        // 更新對手數據
+        winningTeam.forEach(opponent => {
+          if (!playerStats[player].opponents[opponent]) {
+            playerStats[player].opponents[opponent] = 0;
+          }
+          playerStats[player].opponents[opponent] -= 0.2;
+        });
+      });
+      
+      // 保存數據
+      saveData();
+      
+      // 提示用戶
+      alert(`已記錄比賽結果：隊伍${winner}獲勝！機器學習模型已更新。`);
+      
+      // 隱藏結果記錄區
+      document.getElementById('matchResultContainer').style.display = 'none';
     }
 
     renderList();
